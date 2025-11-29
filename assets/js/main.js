@@ -65,6 +65,12 @@ function initSiteInfo() {
 }
 initSiteInfo();
 
+// ========== 配置 marked ==========
+marked.setOptions({
+    breaks: true,  // 将换行符转换为 <br>
+    gfm: true      // 启用 GitHub Flavored Markdown
+});
+
 var limit = memo.limit;
 var memosHost = memo.host.replace(/\/$/, '');
 var page = 1, offset = 0, nextLength = 0, nextDom = '', nextPageToken = '', btnRemove = 0, tag = '';
