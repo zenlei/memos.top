@@ -5,9 +5,9 @@
 
 var siteConfig = {
     // ========== 站点信息 ==========
-    title: "Ming's 哔哔",
-    bio: "Built & Found - 既创，且寻",
-    description: "一个热爱技术与生活的开发者，记录日常点滴与思考。",  // 个人简介
+    title: "Ming's log",
+    bio: "既创，且寻 Built & Found",
+description: "一些关于声学、电子与创造的日常 Acoustics, Electronics & Builds",  // 个人简介
     
     // ========== Memos API 配置 ==========
     memos: {
