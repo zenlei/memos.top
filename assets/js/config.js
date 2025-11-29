@@ -36,6 +36,13 @@ description: "一些关于声学、电子与创造的日常 Acoustics, Electroni
         Comment: 'https://artalk.yanming.net',
     },
     
+    // ========== 主题配置 ==========
+    theme: {
+        auto: true,              // 是否根据时间自动切换主题
+        dayStart: 6,             // 白天开始时间 (小时, 24小时制)
+        dayEnd: 18,              // 白天结束时间 (小时, 24小时制)
+    },
+    
     // ========== 页脚信息 ==========
     footer: {
         author: 'Yan Ming',

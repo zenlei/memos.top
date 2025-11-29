@@ -721,12 +721,38 @@ function formatDateTime(date) {
 }
 
 // ========== Theme Toggle ==========
-const localTheme = window.localStorage && window.localStorage.getItem("theme");
+// 使用 sessionStorage，浏览器关闭后自动失效
+const localTheme = window.sessionStorage && window.sessionStorage.getItem("theme");
 const themeToggle = document.querySelector(".theme-toggle");
 
+// 判断当前是否是白天
+function isDaytime() {
+    const themeConfig = (typeof siteConfig !== 'undefined' && siteConfig.theme) || {};
+    const dayStart = themeConfig.dayStart !== undefined ? themeConfig.dayStart : 6;
+    const dayEnd = themeConfig.dayEnd !== undefined ? themeConfig.dayEnd : 18;
+    const currentHour = new Date().getHours();
+    return currentHour >= dayStart && currentHour < dayEnd;
+}
+
+// 根据时间获取自动主题
+function getAutoTheme() {
+    return isDaytime() ? 'light-theme' : 'dark-theme';
+}
+
+// 检查是否启用自动主题切换
+function isAutoThemeEnabled() {
+    return typeof siteConfig !== 'undefined' && siteConfig.theme && siteConfig.theme.auto === true;
+}
+
+// 初始化主题
 if (localTheme) {
+    // 用户手动设置过主题，使用用户设置
     document.body.classList.remove("light-theme", "dark-theme");
     document.body.classList.add(localTheme);
+} else if (isAutoThemeEnabled()) {
+    // 启用自动主题且用户未手动设置，根据时间自动切换
+    document.body.classList.remove("light-theme", "dark-theme");
+    document.body.classList.add(getAutoTheme());
 }
 
 if (themeToggle) {
@@ -741,7 +767,7 @@ if (themeToggle) {
             document.body.classList.toggle("dark-theme");
         }
         
-        window.localStorage && window.localStorage.setItem(
+        window.sessionStorage && window.sessionStorage.setItem(
             "theme",
             document.body.classList.contains("dark-theme") ? "dark-theme" : "light-theme"
         );
