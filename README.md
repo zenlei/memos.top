@@ -1,30 +1,40 @@
-<p align="center"><a href="https://usememos.com"><img height="64px" src="https://raw.githubusercontent.com/eallion/memos.top/main/assets/img/logo-full.webp" alt="✍️ memos" /></a></p>
+通过 Memos API 渲染的静态网页。
+简单的 HTML、纯净的 CSS、原生的 JS。
 
-<p align="center">Memos Top. 通过 Memos API 渲染的静态网页。</p>
-<p align="center">简单的 HTML、纯净的 CSS、原生的 JS。</p>
+基于原项目进行了以下修改：
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Memos-Top-orange" />
-  <img src="https://img.shields.io/badge/Author-eallion-brightgreen" />
-</p>
+个人只使用新版（>= `v0.25.0`），老版（< `v0.25.0`）未进行测试。
 
-<p align="center">
-  <a href="https://memos.top/">Live Demo</a> •
-  <a href="https://eallion.com/memos" target="_blank" rel="noopener noreferrer" class="pure-menu-link">I'm Feeling Lucky ✍</a>
-</p>
+### 新增功能
 
-<p align="center">
-  <a href="https://memos.top/" target="_blank"><img alt="Memos Top" src="https://raw.githubusercontent.com/eallion/memos.top/main/screenshot.png"></a>
-</p>
+- **Artalk 评论系统集成**
+  - 每条 Memo 支持独立评论
+  - 评论数量显示（使用 `Artalk.loadCountWidget`）
+  - 自动适配深色/浅色主题
+  - 前端与 Memos 后台评论数据互通
+  - 详见 [`memos-artalk/`](./memos-artalk/) 目录
 
-中文 | [English](./README_en.md)
+- **配置文件独立**
+  - 新增 `assets/js/config.js` 统一管理配置
+  - 支持站点信息、导航链接、Artalk 等配置项
 
-> [!TIP]
-> 已支持老版（< `v0.25.0`）和新版（>= `v0.25.0`）两种 API，请配置 `APIVersion`
+### 优化改进
 
-> [!NOTE]  
-> 如果你想把你的 Mastodon（长毛象）的嘟文嵌入到自己的网页中，你可以参考这个项目。  
-> <https://github.com/eallion/mastodon-embed-timeline>
+- **标签筛选优化**：改进中文标签支持，添加清除筛选按钮
+- **时间显示优化**：超过 24 小时显示完整日期时间
+- **UI 样式优化**：重构 CSS 变量，优化响应式布局
+- **代码重构**：移除冗余代码，提升可维护性
+
+### 文件变更
+
+| 文件 | 变更 |
+|------|------|
+| `assets/js/config.js` | 新增，集中配置管理 |
+| `assets/js/main.js` | 重构，添加 Artalk 集成 |
+| `assets/css/style.css` | 重构，优化样式变量 |
+| `index.html` | 简化，配置移至 config.js |
+| `memos-artalk/` | 新增，Memos 后台评论集成 |
+
 
 ### 前端框架
 
@@ -46,23 +56,37 @@ git clone https://github.com/eallion/memos.top
 
 ##### 2. 设置
 
-在 `index.html` 文件中调整以下设置：
+编辑 `assets/js/config.js` 文件，调整以下配置：
 
-```html
-<script type="text/javascript">
-  var memos = {
-    host: 'https://demo.usememos.com/', // 修改为自己部署 Memos 的网址，末尾有 / 斜杠。
-    limit: '10', // 每页显示的条数，默认显示 10 条。
-    creatorId: '1', // 老的实例是 101，新的实例是 1。https://demo.usememos.com/u/1
-    domId: '#memos', // 默认为 #memos，一般不用修改。
-    username: 'memos', // 自定义显示在前端的 ID。
-    name: 'Official Demo', // 自定义显示在前端的全名。
-    language: 'zh-CN', // `en` `zh-CN` 等，用于显示相对时间。
-    APIVersion: 'new', // `new` 或者 `legacy`，Memos API 版本，小于 `v0.25.0`: 填写：`legacy`，大于等于 `v0.25.0`：填写`new`。
-    total: true, // 显示 Memos 总条数。新版没有好办法显示，老版本也关闭了 Amount API。
-    doubanAPI: '', // 填入一个 API 渲染豆瓣条目，不填不渲染，只显示 URL，自建 API：https://github.com/eallion/douban-api-rs
-  }
-</script>
+```javascript
+var siteConfig = {
+    // Memos API 配置
+    memos: {
+        host: 'https://demo.usememos.com/',  // Memos 服务地址，末尾有 /
+        limit: '10',                          // 每页显示条数
+        creatorId: '1',                       // 用户 ID
+        domId: '#memos',
+        username: 'memos',                    // 显示的用户名
+        name: 'Official Demo',                // 显示的全名
+        language: 'zh-CN',
+        APIVersion: 'new',                    // 'new' (>= v0.25.0) 或 'legacy'
+        total: true,
+        doubanAPI: '',
+    },
+    
+    // Artalk 评论配置（可选）
+    artalk: {
+        enabled: true,                        // 是否启用评论
+        server: 'https://artalk.example.com', // Artalk 服务地址
+        site: 'My Site',                      // Artalk 站点名称
+    },
+    
+    // 站点信息
+    site: {
+        title: 'Memos',
+        subtitle: '记录生活',
+    },
+};
 ```
 
 ##### 3. 网站图标和头像 (*可选*)
@@ -163,13 +187,6 @@ https://movie.douban.com/subject/1889243/
 ```
 
 </details>
-
-> [!TIP]
-> 本项目 CDN 加速及安全防护由 Tencent EdgeOne 赞助
-
-[亚洲最佳 CDN、边缘和安全解决方案 - Tencent EdgeOne](https://edgeone.ai/zh?from=github)
-
-[![](https://edgeone.ai/media/34fe3a45-492d-4ea4-ae5d-ea1087ca7b4b.png)](https://edgeone.ai/zh?from=github)
 
 ### [许可证 GLWTPL](https://github.com/me-shaon/GLWTPL)
 

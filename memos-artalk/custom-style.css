@@ -1,0 +1,26 @@
+/**
+ * Memos 自定义样式 - Artalk 评论集成
+ * 
+ * 使用方法：
+ * 1. 登录 Memos 后台
+ * 2. 进入 设置 -> 系统 -> 自定义样式
+ * 3. 粘贴此 CSS 内容
+ */
+
+/* 评论区上边距 */
+.atk-main-editor {
+    margin-top: 20px;
+}
+
+/* 评论容器样式 */
+#Comments {
+    margin-top: 20px;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.02);
+    border-radius: 8px;
+}
+
+/* 深色模式适配 */
+.dark #Comments {
+    background: rgba(255, 255, 255, 0.05);
+}
