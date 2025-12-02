@@ -71,6 +71,44 @@ marked.setOptions({
     gfm: true      // 启用 GitHub Flavored Markdown
 });
 
+// ========== 数学公式渲染 ==========
+function renderMathInElement(element) {
+    if (typeof renderMathInElement !== 'undefined' && window.renderMathInElement) {
+        window.renderMathInElement(element, {
+            delimiters: [
+                {left: '$$', right: '$$', display: true},   // 块级公式
+                {left: '$', right: '$', display: false},    // 行内公式
+                {left: '\\[', right: '\\]', display: true}, // 块级公式（LaTeX 风格）
+                {left: '\\(', right: '\\)', display: false} // 行内公式（LaTeX 风格）
+            ],
+            throwOnError: false,
+            strict: false
+        });
+    }
+}
+
+// 渲染页面中所有 memo 内容的数学公式
+function renderAllMath() {
+    if (typeof window.renderMathInElement === 'undefined') {
+        // KaTeX 尚未加载完成，稍后重试
+        setTimeout(renderAllMath, 100);
+        return;
+    }
+    var memoContents = document.querySelectorAll('.memo-content');
+    memoContents.forEach(function(el) {
+        window.renderMathInElement(el, {
+            delimiters: [
+                {left: '$$', right: '$$', display: true},
+                {left: '$', right: '$', display: false},
+                {left: '\\[', right: '\\]', display: true},
+                {left: '\\(', right: '\\)', display: false}
+            ],
+            throwOnError: false,
+            strict: false
+        });
+    });
+}
+
 var limit = memo.limit;
 var memosHost = memo.host.replace(/\/$/, '');
 var page = 1, offset = 0, nextLength = 0, nextDom = '', nextPageToken = '', btnRemove = 0, tag = '';
@@ -466,6 +504,9 @@ function updateHTMl(data) {
     
     // Initialize image lightbox
     window.ViewImage && ViewImage.init('.memo-content img');
+    
+    // 渲染数学公式
+    renderAllMath();
     
     // 更新 Artalk 评论计数
     if (siteConfig.artalk && siteConfig.artalk.enabled) {
