@@ -112,12 +112,6 @@ img {
     justify-content: space-between;
 }
 
-.site-brand {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
 .site-brand .brand-link {
     display: flex;
     align-items: center;
