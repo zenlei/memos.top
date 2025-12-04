@@ -81,6 +81,22 @@ function initSiteInfo() {
                 footerBeian.style.display = 'block';
             }
         }
+        
+        // 访问统计
+        var siteStats = document.getElementById('site-stats');
+        if (siteStats && siteConfig.stats && siteConfig.stats.enabled) {
+            var statsHtml = [];
+            if (siteConfig.stats.showPV) {
+                statsHtml.push('<span class="stat-pv">访问量: <span id="busuanzi_site_pv">-</span></span>');
+            }
+            if (siteConfig.stats.showUV) {
+                statsHtml.push('<span class="stat-uv">访客数: <span id="busuanzi_site_uv">-</span></span>');
+            }
+            if (statsHtml.length > 0) {
+                siteStats.innerHTML = statsHtml.join(' · ');
+                siteStats.style.display = 'inline';
+            }
+        }
     }
 }
 initSiteInfo();

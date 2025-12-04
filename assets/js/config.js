@@ -43,6 +43,13 @@ description: "一些关于声学、电子与创造的日常 Acoustics, Electroni
         dayEnd: 18,              // 白天结束时间 (小时, 24小时制)
     },
     
+    // ========== 访问统计 ==========
+    stats: {
+        enabled: true,                    // 是否启用访问统计
+        showPV: true,                     // 是否显示 PV (访问量)
+        showUV: true,                     // 是否显示 UV (访客数)
+    },
+    
     // ========== 页脚信息 ==========
     footer: {
         author: 'Yan Ming',
