@@ -48,7 +48,7 @@ description: "一些关于声学、电子与创造的日常 Acoustics, Electroni
         author: 'Yan Ming',
         authorUrl: 'https://yanming.net/',
         icp: '萌ICP备20220550号',                          // ICP 备案号，如：京ICP备12345678号
-        icpUrl: 'https://icp.gov.moe/',  // ICP 备案链接
+        icpUrl: 'https://icp.gov.moe/?keyword=20220550',  // ICP 备案链接
         gongan: '',                        // 公安备案号，如：京公网安备 11010102001234号
         gonganUrl: '',                     // 公安备案链接，如：http://www.beian.gov.cn/portal/registerSystemInfo?recordcode=11010102001234
     }
