@@ -767,6 +767,15 @@ body.dark-theme .icon-sun { display: none; }
     color: var(--accent-color);
 }
 
+.footer-beian {
+    margin-top: 8px;
+    font-size: 12px !important;
+}
+
+.footer-beian a {
+    margin: 0 4px;
+}
+
 /* ========== Back to Top ========== */
 .backtop {
     position: fixed;

@@ -61,6 +61,26 @@ function initSiteInfo() {
             footerAuthor.textContent = siteConfig.footer.author || '';
             footerAuthor.href = siteConfig.footer.authorUrl || '#';
         }
+        
+        // 备案号
+        var footerBeian = document.getElementById('footer-beian');
+        if (footerBeian && siteConfig.footer) {
+            var beianHtml = [];
+            // ICP 备案
+            if (siteConfig.footer.icp) {
+                var icpUrl = siteConfig.footer.icpUrl || 'https://beian.miit.gov.cn/';
+                beianHtml.push('<a href="' + icpUrl + '" target="_blank" rel="noopener noreferrer">' + siteConfig.footer.icp + '</a>');
+            }
+            // 公安备案
+            if (siteConfig.footer.gongan) {
+                var gonganUrl = siteConfig.footer.gonganUrl || 'http://www.beian.gov.cn/';
+                beianHtml.push('<a href="' + gonganUrl + '" target="_blank" rel="noopener noreferrer"><img src="assets/img/gongan.png" alt="" style="vertical-align:middle;margin-right:3px;width:14px;height:14px;">' + siteConfig.footer.gongan + '</a>');
+            }
+            if (beianHtml.length > 0) {
+                footerBeian.innerHTML = beianHtml.join(' · ');
+                footerBeian.style.display = 'block';
+            }
+        }
     }
 }
 initSiteInfo();
