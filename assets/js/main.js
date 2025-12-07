@@ -580,7 +580,10 @@ function loadArtalkCommentCounts() {
 // ========== Process Resources ==========
 function processResources(memoData, apiVersion) {
     var imgUrl = '', resUrl = '';
-    var resourceList = apiVersion === 'new' ? memoData.resources : memoData.resourceList;
+    // 新版 API 使用 attachments 或 resources，旧版使用 resourceList
+    var resourceList = apiVersion === 'new' 
+        ? (memoData.attachments || memoData.resources) 
+        : memoData.resourceList;
     
     if (!resourceList || resourceList.length === 0) return '';
     
