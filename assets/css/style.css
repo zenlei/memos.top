@@ -963,3 +963,30 @@ body:not(.light-theme) .aplayer .aplayer-info .aplayer-music .aplayer-author {
 .hidden {
     display: none !important;
 }
+
+/* ========== KaTeX Math Styles ========== */
+.katex-block {
+    display: block;
+    text-align: center;
+    margin: 1em 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.katex-block .katex {
+    text-align: center;
+}
+
+.memo-content .katex {
+    font-size: 1.1em;
+}
+
+.memo-content .katex-display {
+    margin: 1em 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.memo-content .katex-display > .katex {
+    white-space: normal;
+}

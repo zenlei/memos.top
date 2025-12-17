@@ -108,25 +108,100 @@ marked.setOptions({
 });
 
 // ========== 数学公式渲染 ==========
-function renderMathInElement(element) {
-    if (typeof renderMathInElement !== 'undefined' && window.renderMathInElement) {
-        window.renderMathInElement(element, {
-            delimiters: [
-                {left: '$$', right: '$$', display: true},   // 块级公式
-                {left: '$', right: '$', display: false},    // 行内公式
-                {left: '\\[', right: '\\]', display: true}, // 块级公式（LaTeX 风格）
-                {left: '\\(', right: '\\)', display: false} // 行内公式（LaTeX 风格）
-            ],
-            throwOnError: false,
-            strict: false
-        });
-    }
+// 存储提取的公式
+var mathExpressions = [];
+var mathPlaceholderPrefix = '%%MATH_PLACEHOLDER_';
+var mathPlaceholderSuffix = '%%';
+
+// 提取并保护数学公式，防止被 marked 破坏
+function extractMath(text) {
+    mathExpressions = [];
+    var index = 0;
+    
+    // 块级公式 $$...$$ （优先处理，避免被行内公式匹配）
+    text = text.replace(/\$\$([\s\S]+?)\$\$/g, function(match, formula) {
+        var placeholder = mathPlaceholderPrefix + index + '_BLOCK' + mathPlaceholderSuffix;
+        mathExpressions.push({ index: index, formula: formula, display: true });
+        index++;
+        return placeholder;
+    });
+    
+    // 块级公式 \[...\]
+    text = text.replace(/\\\[([\s\S]+?)\\\]/g, function(match, formula) {
+        var placeholder = mathPlaceholderPrefix + index + '_BLOCK' + mathPlaceholderSuffix;
+        mathExpressions.push({ index: index, formula: formula, display: true });
+        index++;
+        return placeholder;
+    });
+    
+    // 行内公式 $...$ （不匹配已处理的占位符）
+    // 使用更兼容的正则，避免 lookbehind
+    text = text.replace(/\$([^$\n]+?)\$/g, function(match, formula, offset, string) {
+        // 检查是否是 $$ 的一部分（已被处理）
+        if (formula.indexOf(mathPlaceholderPrefix) !== -1) {
+            return match;
+        }
+        var placeholder = mathPlaceholderPrefix + index + '_INLINE' + mathPlaceholderSuffix;
+        mathExpressions.push({ index: index, formula: formula, display: false });
+        index++;
+        return placeholder;
+    });
+    
+    // 行内公式 \(...\)
+    text = text.replace(/\\\(([\s\S]+?)\\\)/g, function(match, formula) {
+        var placeholder = mathPlaceholderPrefix + index + '_INLINE' + mathPlaceholderSuffix;
+        mathExpressions.push({ index: index, formula: formula, display: false });
+        index++;
+        return placeholder;
+    });
+    
+    return text;
 }
 
-// 渲染页面中所有 memo 内容的数学公式
+// 恢复数学公式占位符为 KaTeX 渲染的 HTML
+function restoreMath(html) {
+    for (var i = 0; i < mathExpressions.length; i++) {
+        var expr = mathExpressions[i];
+        var placeholderBlock = mathPlaceholderPrefix + expr.index + '_BLOCK' + mathPlaceholderSuffix;
+        var placeholderInline = mathPlaceholderPrefix + expr.index + '_INLINE' + mathPlaceholderSuffix;
+        
+        try {
+            var rendered = katex.renderToString(expr.formula, {
+                displayMode: expr.display,
+                throwOnError: false,
+                strict: false
+            });
+            
+            if (expr.display) {
+                // 块级公式包装在 div 中
+                rendered = '<div class="katex-block">' + rendered + '</div>';
+                html = html.replace(new RegExp('<p>' + escapeRegExpForReplace(placeholderBlock) + '</p>', 'g'), rendered);
+                html = html.replace(new RegExp(escapeRegExpForReplace(placeholderBlock), 'g'), rendered);
+            } else {
+                // 行内公式
+                html = html.replace(new RegExp(escapeRegExpForReplace(placeholderInline), 'g'), rendered);
+            }
+        } catch (e) {
+            console.error('KaTeX render error:', e);
+            // 渲染失败时显示原始公式
+            var fallback = expr.display ? '$$' + expr.formula + '$$' : '$' + expr.formula + '$';
+            html = html.replace(new RegExp(escapeRegExpForReplace(placeholderBlock), 'g'), fallback);
+            html = html.replace(new RegExp(escapeRegExpForReplace(placeholderInline), 'g'), fallback);
+        }
+    }
+    return html;
+}
+
+// 转义正则表达式特殊字符（用于替换）
+function escapeRegExpForReplace(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// 渲染页面中所有 memo 内容的数学公式（保留兼容性，但主要逻辑已移至 marked 处理流程）
 function renderAllMath() {
+    // 此函数现在主要用于兼容性，实际渲染在 restoreMath 中完成
+    // 如果有遗漏的公式，使用 auto-render 作为后备
     if (typeof window.renderMathInElement === 'undefined') {
-        // KaTeX 尚未加载完成，稍后重试
         setTimeout(renderAllMath, 100);
         return;
     }
@@ -453,6 +528,9 @@ function updateHTMl(data) {
             contentForParse = contentForParse.replace(TAG_REG, '');
         }
         
+        // 提取数学公式，防止被 marked 破坏
+        contentForParse = extractMath(contentForParse);
+        
         // Parse content with marked
         var memoContREG = marked.parse(contentForParse)
             .replace(BILIBILI_REG, "<div class='video-wrapper'><iframe src='//www.bilibili.com/blackboard/html5mobileplayer.html?bvid=$1&as_wide=1&high_quality=1&danmaku=0' scrolling='no' border='0' frameborder='no' framespacing='0' allowfullscreen='true'></iframe></div>")
@@ -462,6 +540,9 @@ function updateHTMl(data) {
             .replace(QQVIDEO_REG, "<div class='video-wrapper'><iframe src='//v.qq.com/iframe/player.html?vid=$1' allowFullScreen='true' frameborder='no'></iframe></div>")
             .replace(SPOTIFY_REG, "<div class='spotify-wrapper'><iframe style='border-radius:12px' src='https://open.spotify.com/embed/$1/$2?utm_source=generator&theme=0' width='100%' frameBorder='0' allowfullscreen='' allow='autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture' loading='lazy'></iframe></div>")
             .replace(YOUKU_REG, "<div class='video-wrapper'><iframe src='https://player.youku.com/embed/$1' frameborder=0 'allowfullscreen'></iframe></div>");
+        
+        // 恢复数学公式并渲染为 KaTeX HTML
+        memoContREG = restoreMath(memoContREG);
         
         // Process resources/images
         memoContREG += processResources(memoData, memo.APIVersion);
