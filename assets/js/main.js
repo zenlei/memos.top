@@ -1,5 +1,6 @@
 // ========== 从 config.js 读取配置 ==========
-var memo = (typeof siteConfig !== "undefined" && siteConfig.memos) ? siteConfig.memos : {
+// 读取配置（优先 siteConfig.memos，其次全局 memos，最后默认）
+var memoDefaults = {
     host: 'https://demo.usememos.com/',
     limit: '10',
     creatorId: '1',
@@ -12,14 +13,24 @@ var memo = (typeof siteConfig !== "undefined" && siteConfig.memos) ? siteConfig.
     doubanAPI: '',
 };
 
-// 兼容旧的 memos 变量覆盖
-if (typeof memos !== "undefined") {
-    for (var key in memos) {
-        if (memos[key]) {
-            memo[key] = memos[key];
+function loadMemoConfig() {
+    var cfg = Object.assign({}, memoDefaults);
+    if (typeof siteConfig !== "undefined" && siteConfig.memos) {
+        Object.assign(cfg, siteConfig.memos);
+    }
+    if (typeof memos !== "undefined") {
+        for (var key in memos) {
+            if (memos[key]) {
+                cfg[key] = memos[key];
+            }
         }
     }
+    return cfg;
 }
+
+var memo = loadMemoConfig();
+var markedLoadRetries = 0;
+var markedFallbackLoaded = false;
 
 // ========== 初始化站点信息 ==========
 function initSiteInfo() {
@@ -102,10 +113,54 @@ function initSiteInfo() {
 initSiteInfo();
 
 // ========== 配置 marked ==========
-marked.setOptions({
-    breaks: true,  // 将换行符转换为 <br>
-    gfm: true      // 启用 GitHub Flavored Markdown
-});
+function initMarked() {
+    if (typeof marked === 'undefined') {
+        markedLoadRetries++;
+        if (!markedFallbackLoaded && markedLoadRetries === 20) { // ~2s
+            loadMarkedFallback();
+        }
+        if (markedLoadRetries > 200) { // ~20s 无法加载
+            console.error('marked load timeout');
+            setLoadButtonText('渲染模块加载失败');
+            return;
+        }
+        setTimeout(initMarked, 100);
+        return;
+    }
+    marked.setOptions({
+        breaks: true,  // 将换行符转换为 <br>
+        gfm: true      // 启用 GitHub Flavored Markdown
+    });
+}
+initMarked();
+
+// 等待 marked 可用后再执行回调（避免 CDN 加载时机导致报错）
+function waitForMarked(callback) {
+    if (typeof marked !== 'undefined') {
+        callback();
+        return;
+    }
+    markedLoadRetries++;
+    if (!markedFallbackLoaded && markedLoadRetries === 20) {
+        loadMarkedFallback();
+    }
+    if (markedLoadRetries > 200) {
+        console.error('marked load timeout');
+        setLoadButtonText('渲染模块加载失败');
+        return;
+    }
+    setTimeout(function() {
+        waitForMarked(callback);
+    }, 100);
+}
+
+function loadMarkedFallback() {
+    markedFallbackLoaded = true;
+    var script = document.createElement('script');
+    script.src = 'https://unpkg.com/marked@14.0.0/marked.umd.min.js';
+    script.defer = true;
+    document.head.appendChild(script);
+}
 
 // ========== 数学公式渲染 ==========
 // 存储提取的公式
@@ -225,6 +280,34 @@ var memosHost = memo.host.replace(/\/$/, '');
 var page = 1, offset = 0, nextLength = 0, nextDom = '', nextPageToken = '', btnRemove = 0, tag = '';
 var memoDom = document.querySelector(memo.domId);
 
+function setLoadButtonText(text) {
+    var btn = document.querySelector('button.button-load');
+    if (btn) btn.textContent = text;
+}
+
+function removeLoadButton() {
+    var btn = document.querySelector('button.button-load');
+    if (btn) btn.remove();
+    btnRemove = 1;
+}
+
+function handleFetchError(err) {
+    console.error('Fetch error:', err);
+    setLoadButtonText('重试加载');
+    if (memoDom && !document.getElementById('memo-error')) {
+        memoDom.insertAdjacentHTML('beforebegin', '<div id="memo-error" class="memo-error" style="color:#e54;margin:8px 0;">加载失败，请重试</div>');
+    }
+}
+
+// 受信任的 iframe 域名/路径前缀（与现有正则替换保持一致）
+const TRUSTED_IFRAME_RULES = [
+    { host: 'www.bilibili.com', pathPrefix: '/blackboard/html5mobileplayer.html' },
+    { host: 'www.youtube.com', pathPrefix: '/embed/' },
+    { host: 'open.spotify.com', pathPrefix: '/embed/' },
+    { host: 'v.qq.com', pathPrefix: '/iframe/player.html' },
+    { host: 'player.youku.com', pathPrefix: '/embed/' },
+];
+
 // ========== API URL ==========
 let memoUrl;
 if (memo.APIVersion === 'new') {
@@ -240,25 +323,32 @@ if (memoDom) {
     // Set avatar
     setUserAvatar();
     
-    // Add loading
-    var load = '<button class="load-btn button-load">加载中...</button>';
-    memoDom.insertAdjacentHTML('afterend', load);
-    
-    // Fetch first batch
+    ensureLoadButton();
     getFirstList();
-    
-    // Add load more button listener
+}
+
+function ensureLoadButton() {
     var btn = document.querySelector("button.button-load");
-    btn.addEventListener("click", function () {
-        btn.textContent = '加载中...';
-        updateHTMl(nextDom);
-        if (nextLength < limit) {
-            document.querySelector("button.button-load").remove();
-            btnRemove = 1;
-            return;
-        }
-        getNextList();
-    });
+    if (!btn) {
+        memoDom.insertAdjacentHTML('afterend', '<button class="load-btn button-load">加载中...</button>');
+        btn = document.querySelector("button.button-load");
+    }
+    btn.onclick = onLoadMoreClick;
+    return btn;
+}
+
+function onLoadMoreClick() {
+    setLoadButtonText('加载中...');
+    if (!nextDom) {
+        getNextList({ appendAfterFetch: true });
+        return;
+    }
+    updateHTMl(nextDom);
+    if (nextLength < limit) {
+        removeLoadButton();
+        return;
+    }
+    getNextList({ prefetchOnly: true });
 }
 
 // ========== Set User Avatar ==========
@@ -278,65 +368,78 @@ function getFirstList() {
     let memoUrl_first;
     if (memo.APIVersion === 'new') {
         memoUrl_first = memoUrl + '&pageSize=' + limit;
-        fetch(memoUrl_first).then(res => res.json()).then(resdata => {
+        fetchJson(memoUrl_first, { onError: handleFetchError }).then(resdata => {
             updateHTMl(resdata);
             nextPageToken = resdata.nextPageToken;
             var nowLength = resdata.memos ? resdata.memos.length : 0;
             if (nowLength < limit) {
-                document.querySelector("button.button-load").remove();
-                btnRemove = 1;
+                removeLoadButton();
                 return;
             }
             page++;
-            getNextList();
-        });
+            getNextList({ prefetchOnly: true });
+        }).catch(() => {});
     } else if (memo.APIVersion === 'legacy') {
         memoUrl_first = memoUrl + "&limit=" + limit;
-        fetch(memoUrl_first).then(res => res.json()).then(resdata => {
+        fetchJson(memoUrl_first, { onError: handleFetchError }).then(resdata => {
             updateHTMl(resdata);
             var nowLength = resdata.length;
             if (nowLength < limit) {
-                document.querySelector("button.button-load").remove();
-                btnRemove = 1;
+                removeLoadButton();
                 return;
             }
             page++;
             offset = limit * (page - 1);
-            getNextList();
-        });
+            getNextList({ prefetchOnly: true });
+        }).catch(() => {});
     }
 }
 
 // ========== Get Next List ==========
-function getNextList() {
+function getNextList(options) {
+    var opts = options || {};
     if (memo.APIVersion === 'new') {
         var memoUrl_next = memoUrl + '&pageSize=' + limit + '&pageToken=' + nextPageToken;
-        fetch(memoUrl_next).then(res => res.json()).then(resdata => {
+        fetchJson(memoUrl_next, { onError: handleFetchError }).then(resdata => {
             nextPageToken = resdata.nextPageToken;
             nextDom = resdata;
             nextLength = resdata.memos ? resdata.memos.length : 0;
             page++;
             if (nextLength < 1) {
-                document.querySelector("button.button-load").remove();
-                btnRemove = 1;
+                removeLoadButton();
                 return;
             }
-        });
+            if (opts.appendAfterFetch) {
+                updateHTMl(nextDom);
+                if (nextLength < limit) {
+                    removeLoadButton();
+                    return;
+                }
+                getNextList({ prefetchOnly: true });
+            }
+        }).catch(() => {});
     } else if (memo.APIVersion === 'legacy') {
         var memoUrl_next = tag 
             ? memoUrl + "&limit=" + limit + "&offset=" + offset + "&tag=" + tag
             : memoUrl + "&limit=" + limit + "&offset=" + offset;
-        fetch(memoUrl_next).then(res => res.json()).then(resdata => {
+        fetchJson(memoUrl_next, { onError: handleFetchError }).then(resdata => {
             nextDom = resdata;
             nextLength = resdata.length;
             page++;
             offset = limit * (page - 1);
             if (nextLength < 1) {
-                document.querySelector("button.button-load").remove();
-                btnRemove = 1;
+                removeLoadButton();
                 return;
             }
-        });
+            if (opts.appendAfterFetch) {
+                updateHTMl(nextDom);
+                if (nextLength < limit) {
+                    removeLoadButton();
+                    return;
+                }
+                getNextList({ prefetchOnly: true });
+            }
+        }).catch(() => {});
     }
 }
 
@@ -349,18 +452,7 @@ document.addEventListener('click', function (event) {
         
         if (btnRemove) {
             btnRemove = 0;
-            memoDom.insertAdjacentHTML('afterend', '<button class="load-btn button-load">加载中...</button>');
-            var btn = document.querySelector("button.button-load");
-            btn.addEventListener("click", function () {
-                btn.textContent = '加载中...';
-                updateHTMl(nextDom);
-                if (nextLength < limit) {
-                    document.querySelector("button.button-load").remove();
-                    btnRemove = 1;
-                    return;
-                }
-                getNextList();
-            });
+            ensureLoadButton();
         }
         
         getTagFirstList();
@@ -394,7 +486,7 @@ function getTagFirstList() {
         fetchAllMemosWithTag(tagFilterUrl, []);
     } else if (memo.APIVersion === 'legacy') {
         var memoUrl_tag = memoUrl + "&limit=" + limit + "&tag=" + tag;
-        fetch(memoUrl_tag).then(res => res.json()).then(resdata => {
+        fetchJson(memoUrl_tag, { onError: handleFetchError }).then(resdata => {
             updateHTMl(resdata);
             var nowLength = resdata.length;
             if (nowLength < limit) {
@@ -412,7 +504,7 @@ function getTagFirstList() {
 
 // 递归获取所有包含指定标签的 memos
 function fetchAllMemosWithTag(url, allMemos) {
-    fetch(url).then(res => res.json()).then(resdata => {
+    fetchJson(url).then(resdata => {
         var memosList = resdata.memos || [];
         
         // 筛选包含指定标签的 memos
@@ -440,7 +532,7 @@ function fetchAllMemosWithTag(url, allMemos) {
             if (loadBtn) loadBtn.remove();
             btnRemove = 1;
         }
-    });
+    }).catch(() => {});
 }
 
 // 转义正则特殊字符
@@ -463,18 +555,7 @@ function clearFilter() {
     
     if (btnRemove) {
         btnRemove = 0;
-        memoDom.insertAdjacentHTML('afterend', '<button class="load-btn button-load">加载中...</button>');
-        var btn = document.querySelector("button.button-load");
-        btn.addEventListener("click", function () {
-            btn.textContent = '加载中...';
-            updateHTMl(nextDom);
-            if (nextLength < limit) {
-                document.querySelector("button.button-load").remove();
-                btnRemove = 1;
-                return;
-            }
-            getNextList();
-        });
+        ensureLoadButton();
     }
     
     getFirstList();
@@ -482,6 +563,12 @@ function clearFilter() {
 
 // ========== Update HTML ==========
 function updateHTMl(data) {
+    if (typeof marked === 'undefined') {
+        waitForMarked(function() {
+            updateHTMl(data);
+        });
+        return;
+    }
     var memoResult = "";
     
     // Regex patterns - 改进的标签正则，支持中文标签，不要求后面有空格
@@ -532,7 +619,7 @@ function updateHTMl(data) {
         contentForParse = extractMath(contentForParse);
         
         // Parse content with marked
-        var memoContREG = marked.parse(contentForParse)
+        var memoParsed = marked.parse(contentForParse)
             .replace(BILIBILI_REG, "<div class='video-wrapper'><iframe src='//www.bilibili.com/blackboard/html5mobileplayer.html?bvid=$1&as_wide=1&high_quality=1&danmaku=0' scrolling='no' border='0' frameborder='no' framespacing='0' allowfullscreen='true'></iframe></div>")
             .replace(YOUTUBE_REG, "<div class='video-wrapper'><iframe src='https://www.youtube.com/embed/$1' title='YouTube video player' frameborder='0' allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture' allowfullscreen></iframe></div>")
             .replace(NETEASE_MUSIC_REG, "<meting-js auto='https://music.163.com/#/song?id=$1'></meting-js>")
@@ -540,6 +627,9 @@ function updateHTMl(data) {
             .replace(QQVIDEO_REG, "<div class='video-wrapper'><iframe src='//v.qq.com/iframe/player.html?vid=$1' allowFullScreen='true' frameborder='no'></iframe></div>")
             .replace(SPOTIFY_REG, "<div class='spotify-wrapper'><iframe style='border-radius:12px' src='https://open.spotify.com/embed/$1/$2?utm_source=generator&theme=0' width='100%' frameBorder='0' allowfullscreen='' allow='autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture' loading='lazy'></iframe></div>")
             .replace(YOUKU_REG, "<div class='video-wrapper'><iframe src='https://player.youku.com/embed/$1' frameborder=0 'allowfullscreen'></iframe></div>");
+
+        // 清洗 HTML
+        var memoContREG = sanitizeHtml(memoParsed, { memosHost: memosHost, trustedIframeRules: TRUSTED_IFRAME_RULES });
         
         // 恢复数学公式并渲染为 KaTeX HTML
         memoContREG = restoreMath(memoContREG);
@@ -932,6 +1022,9 @@ if (themeToggle) {
             "theme",
             document.body.classList.contains("dark-theme") ? "dark-theme" : "light-theme"
         );
+        if (typeof updateArtalkDarkMode === 'function') {
+            setTimeout(updateArtalkDarkMode, 100);
+        }
     });
 }
 
@@ -946,61 +1039,6 @@ if (backTopBtn) {
         }
     });
     backTopBtn.style.display = 'none';
-}
-
-// ========== Artalk Comment System ==========
-var artalkInstances = {};
-
-function toggleArtalk(memoId) {
-    if (!siteConfig.artalk || !siteConfig.artalk.enabled) return;
-    
-    var container = document.querySelector('.artalk-container-' + memoId);
-    if (!container) return;
-    
-    var isHidden = container.style.display === 'none';
-    
-    // Hide all other comment containers
-    document.querySelectorAll('.memo-comment').forEach(function(el) {
-        el.style.display = 'none';
-    });
-    
-    if (isHidden) {
-        container.style.display = 'block';
-        
-        // Initialize Artalk if not already initialized
-        if (!artalkInstances[memoId]) {
-            var pageKey = '/memos/' + memoId;  // Memos 会将 /m/{id} 重定向到 /memos/{id}
-            artalkInstances[memoId] = Artalk.init({
-                el: '#artalk-' + memoId,
-                pageKey: pageKey,
-                pageTitle: 'Memo ' + memoId,
-                server: siteConfig.artalk.server,
-                site: siteConfig.artalk.site,
-                darkMode: document.body.classList.contains('dark-theme') || 
-                         (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches && 
-                          !document.body.classList.contains('light-theme')),
-            });
-        }
-        
-        // Scroll to comment section
-        setTimeout(function() {
-            container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }, 100);
-    }
-}
-
-// Update Artalk dark mode when theme changes
-if (themeToggle) {
-    themeToggle.addEventListener("click", function() {
-        setTimeout(function() {
-            var isDark = document.body.classList.contains('dark-theme') || 
-                        (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches && 
-                         !document.body.classList.contains('light-theme'));
-            Object.values(artalkInstances).forEach(function(instance) {
-                instance.setDarkMode(isDark);
-            });
-        }, 100);
-    });
 }
 
 

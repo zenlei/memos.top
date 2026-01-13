@@ -8,10 +8,10 @@
 	<meta name="referrer" content="no-referrer">
 	<link rel="icon" href="assets/img/logo.webp" type="image/*" />
 	<link href="assets/css/style.css" rel="stylesheet" type="text/css">
-	<link href="assets/css/APlayer.min.css" rel="stylesheet" type="text/css">
-	<link href="assets/css/highlight.github.min.css" rel="stylesheet" type="text/css">
-	<link href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" rel="stylesheet" type="text/css">
-	<link href="https://unpkg.com/artalk/dist/Artalk.css" rel="stylesheet" type="text/css">
+	<link href="https://cdn.staticfile.org/aplayer/1.10.1/APlayer.min.css" rel="stylesheet" type="text/css">
+	<link href="https://cdn.staticfile.org/highlight.js/11.9.0/styles/github.min.css" rel="stylesheet" type="text/css">
+	<link href="https://cdn.staticfile.org/KaTeX/0.16.9/katex.min.css" rel="stylesheet" type="text/css">
+	<link href="https://cdn.staticfile.org/artalk/2.7.3/Artalk.css" rel="stylesheet" type="text/css">
 	<title>Memos</title>
 </head>
 
@@ -86,17 +86,31 @@
 		<svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/></svg>
 	</button>
 
-	<!-- Configuration & Scripts -->
-	<script type="text/javascript" src="assets/js/config.js"></script>
-	<script type="text/javascript" src="assets/js/marked.umd.min.js?v=14.0.0"></script>
-	<script type="text/javascript" src="assets/js/view-image.min.js"></script>
-	<script type="text/javascript" src="assets/js/APlayer.min.js"></script>
-	<script type="text/javascript" src="assets/js/Meting.min.js"></script>
-	<script type="text/javascript" src="https://unpkg.com/artalk/dist/Artalk.js"></script>
-	<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-	<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+	<!-- Configuration -->
+	<script src="assets/js/config.js" defer></script>
+
+	<!-- Rendering & Parsing Libraries -->
+	<script src="https://cdn.staticfile.org/marked/4.3.0/marked.min.js" defer></script>
+	<script src="https://cdn.staticfile.org/KaTeX/0.16.9/katex.min.js" defer></script>
+	<script src="https://cdn.staticfile.org/KaTeX/0.16.9/contrib/auto-render.min.js" defer></script>
+	<script src="https://cdn.staticfile.org/dompurify/3.1.6/purify.min.js" defer></script>
+	<script src="assets/js/view-image.min.js" defer></script>
+	<script src="https://cdn.staticfile.org/aplayer/1.10.1/APlayer.min.js" defer></script>
+	<script src="https://cdn.staticfile.org/meting/2.0.1/Meting.min.js" defer></script>
+
+	<!-- Utilities & API -->
+	<script src="assets/js/utils.js" defer></script>
+	<script src="assets/js/api.js" defer></script>
+
+	<!-- Comments -->
+	<script src="https://cdn.staticfile.org/artalk/2.7.3/Artalk.js" defer></script>
+	<script src="assets/js/artalk.js" defer></script>
+
+	<!-- Analytics -->
 	<script src="//cdn.busuanzi.cc/busuanzi/3.6.9/busuanzi.min.js" defer></script>
-	<script type="text/javascript" src="assets/js/main.js"></script>
+
+	<!-- Application -->
+	<script src="assets/js/main.js" defer></script>
 </body>
 
 </html>

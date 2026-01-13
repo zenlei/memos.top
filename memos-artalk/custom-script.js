@@ -25,7 +25,12 @@ function addArtalkJS() {
 
 // 启动 Artalk
 function startArtalk() {
-    var start = setInterval(function() {
+    // 使用 MutationObserver 监测 memo 详情节点出现，避免无限轮询
+    var observer;
+    var initialized = false;
+
+    function tryInit() {
+        if (initialized) return;
         var artalkDom = document.getElementById('Comments') || '';
         // 适配新版 Memos: .memo-wrapper 或 .memo-container
         var memoAt = document.querySelector('.memo-wrapper') || 
@@ -36,28 +41,36 @@ function startArtalk() {
         // 检查是否在单条 memo 页面 (/m/ 或 /memos/)
         var isMemoPage = /\/(m|memos)\//.test(window.location.href);
         
-        if (isMemoPage && !artalkDom) {
+        if (isMemoPage && !artalkDom && memoAt) {
+            initialized = true;
+            if (observer) observer.disconnect();
             addArtalkJS();
-            if (memoAt) {
-                clearInterval(start);
-                // 在 memo 内容后插入评论容器
-                memoAt.insertAdjacentHTML('afterend', '<div id="Comments" style="margin-top:20px;"></div>');
-                
-                setTimeout(function() {
-                    if (typeof Artalk !== 'undefined') {
-                        Artalk.init({
-                            el: '#Comments',
-                            pageKey: location.pathname,
-                            pageTitle: document.title,
-                            server: ARTALK_SERVER,
-                            site: ARTALK_SITE,
-                            darkMode: 'auto'
-                        });
-                    }
-                }, 1000);
-            }
+            // 在 memo 内容后插入评论容器
+            memoAt.insertAdjacentHTML('afterend', '<div id="Comments" style="margin-top:20px;"></div>');
+            
+            setTimeout(function() {
+                if (typeof Artalk !== 'undefined') {
+                    Artalk.init({
+                        el: '#Comments',
+                        pageKey: location.pathname,
+                        pageTitle: document.title,
+                        server: ARTALK_SERVER,
+                        site: ARTALK_SITE,
+                        darkMode: 'auto'
+                    });
+                }
+            }, 500);
         }
-    }, 1000);
+    }
+
+    // 初次尝试
+    tryInit();
+
+    // 监听 DOM 变化
+    observer = new MutationObserver(function() {
+        tryInit();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
 }
 
 startArtalk();
