@@ -51,11 +51,31 @@
     return fetchJson(url, options);
   }
 
+  function buildDetailUrl(memoConfig, memoId) {
+    var cfg = memoConfig || {};
+    var host = normalizeHost(cfg.host);
+    var apiVersion = cfg.APIVersion || 'new';
+    var normalizedId = memoId || '';
+
+    if (apiVersion === 'new') {
+      return host + '/api/v1/memos/' + encodeURIComponent(normalizedId);
+    }
+
+    return host + '/api/v1/memo/' + encodeURIComponent(normalizedId);
+  }
+
+  function fetchDetail(memoConfig, memoId, options) {
+    var url = buildDetailUrl(memoConfig, memoId);
+    return fetchJson(url, options);
+  }
+
   // 导出全局
   window.memoApi = {
     buildListUrl: buildListUrl,
     fetchList: fetchList,
     buildStatsUrl: buildStatsUrl,
     fetchStats: fetchStats,
+    buildDetailUrl: buildDetailUrl,
+    fetchDetail: fetchDetail,
   };
 })();

@@ -279,6 +279,179 @@ var limit = memo.limit;
 var memosHost = memo.host.replace(/\/$/, '');
 var page = 1, offset = 0, nextLength = 0, nextDom = '', nextPageToken = '', btnRemove = 0, tag = '';
 var memoDom = document.querySelector(memo.domId);
+var currentPageMode = getCurrentPageMode();
+
+function getCurrentPageMode() {
+    return document.body && document.body.getAttribute('data-page') === 'detail' ? 'detail' : 'list';
+}
+
+function isDetailPage() {
+    return currentPageMode === 'detail';
+}
+
+function getMemoId(memoData) {
+    if (!memoData) return '';
+    if (memo.APIVersion === 'new') {
+        return memoData.uid || (memoData.name ? memoData.name.split('/').pop() : '');
+    }
+    return memoData.id;
+}
+
+function buildMemoPermalink(memoId) {
+    return '/memos/' + encodeURIComponent(memoId);
+}
+
+function buildOriginalMemoLink(memoId) {
+    return memosHost + '/m/' + encodeURIComponent(memoId);
+}
+
+function buildTagLink(tagName) {
+    return isDetailPage() ? '/#' + encodeURIComponent(tagName) : '#' + tagName;
+}
+
+function getHashTag() {
+    if (!window.location.hash) return '';
+    var rawHash = window.location.hash.replace(/^#/, '');
+    if (!rawHash) return '';
+    try {
+        return decodeURIComponent(rawHash);
+    } catch (err) {
+        return rawHash;
+    }
+}
+
+function syncTagHash(tagName) {
+    if (!window.history || typeof window.history.replaceState !== 'function') return;
+    var baseUrl = window.location.pathname + window.location.search;
+    var nextHash = tagName ? '#' + encodeURIComponent(tagName) : '';
+    window.history.replaceState(null, '', baseUrl + nextHash);
+}
+
+function updateTagFilterDisplay(tagName) {
+    var filterElem = document.getElementById('tag-filter');
+    var tags = document.getElementById('tags');
+    if (!filterElem || !tags) return;
+
+    if (!tagName) {
+        filterElem.style.display = 'none';
+        tags.innerHTML = '';
+        return;
+    }
+
+    filterElem.style.display = 'block';
+    tags.innerHTML = `#${tagName}<svg class="tag-close" viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>`;
+}
+
+function getDetailMemoId() {
+    var params = new URLSearchParams(window.location.search);
+    var memoIdFromQuery = params.get('id');
+    if (memoIdFromQuery) {
+        return memoIdFromQuery;
+    }
+
+    var pathParts = window.location.pathname.split('/').filter(Boolean);
+    var memosPathIndex = pathParts.indexOf('memos');
+    if (memosPathIndex !== -1 && pathParts[memosPathIndex + 1] && pathParts[memosPathIndex + 1] !== 'index.html') {
+        return decodeURIComponent(pathParts[memosPathIndex + 1]);
+    }
+
+    return '';
+}
+
+function getMemoPreviewText(memoData) {
+    var rawText = memoData && (memoData.snippet || memoData.content) || '';
+    return rawText
+        .replace(/```[\s\S]*?```/g, ' ')
+        .replace(/`([^`]+)`/g, '$1')
+        .replace(/\[(.*?)\]\((.*?)\)/g, '$1')
+        .replace(/[#>*_~\-]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function updateDetailPageInfo(memoData, memoId) {
+    var detailIdEl = document.getElementById('memo-detail-id');
+    var detailLabelEl = document.getElementById('memo-detail-label');
+    var previewText = getMemoPreviewText(memoData);
+    var pageTitle = previewText ? previewText.slice(0, 48) : ('Memo ' + memoId);
+    if (previewText.length > 48) {
+        pageTitle += '...';
+    }
+
+    if (detailIdEl) {
+        detailIdEl.textContent = memoId;
+    }
+    if (detailLabelEl) {
+        detailLabelEl.textContent = pageTitle;
+    }
+
+    document.title = pageTitle + ' - ' + (siteConfig.title || 'Memos');
+}
+
+function showMemoState(message, className) {
+    if (!memoDom) return;
+    memoDom.innerHTML = '<div class="no-results ' + (className || '') + '">' + message + '</div>';
+}
+
+function fetchMemoDetail(memoId) {
+    if (window.memoApi && typeof window.memoApi.fetchDetail === 'function') {
+        return window.memoApi.fetchDetail(memo, memoId, { onError: handleFetchError });
+    }
+
+    var detailUrl = memo.APIVersion === 'new'
+        ? memosHost + '/api/v1/memos/' + encodeURIComponent(memoId)
+        : memosHost + '/api/v1/memo/' + encodeURIComponent(memoId);
+    return fetchJson(detailUrl, { onError: handleFetchError });
+}
+
+function openMemoCommentsWhenReady(memoId, retries) {
+    if (!siteConfig.artalk || !siteConfig.artalk.enabled || typeof toggleArtalk !== 'function') return;
+    if (typeof Artalk === 'undefined') {
+        if ((retries || 0) >= 25) return;
+        setTimeout(function() {
+            openMemoCommentsWhenReady(memoId, (retries || 0) + 1);
+        }, 200);
+        return;
+    }
+    toggleArtalk(memoId);
+}
+
+function initMemoListPage() {
+    setUserAvatar();
+    ensureLoadButton();
+
+    var initialTag = getHashTag();
+    if (initialTag) {
+        tag = initialTag;
+        updateTagFilterDisplay(tag);
+        getTagFirstList();
+        return;
+    }
+
+    getFirstList();
+}
+
+function initMemoDetailPage() {
+    var memoId = getDetailMemoId();
+    if (!memoId) {
+        showMemoState('缺少 memo id，无法加载详情页。');
+        return;
+    }
+
+    showMemoState('正在加载这条 Memo...', 'memo-loading');
+    fetchMemoDetail(memoId).then(function(resdata) {
+        var detailPayload = memo.APIVersion === 'new' ? { memos: [resdata] } : [resdata];
+        updateDetailPageInfo(resdata, memoId);
+        updateHTMl(detailPayload, {
+            replace: true,
+            isDetail: true,
+            memoId: memoId,
+        });
+    }).catch(function(err) {
+        console.error('Load memo detail failed:', err);
+        showMemoState('这条 Memo 不存在或暂时不可访问。');
+    });
+}
 
 function setLoadButtonText(text) {
     var btn = document.querySelector('button.button-load');
@@ -320,11 +493,11 @@ if (memo.APIVersion === 'new') {
 
 // ========== Initialize ==========
 if (memoDom) {
-    // Set avatar
-    setUserAvatar();
-    
-    ensureLoadButton();
-    getFirstList();
+    if (isDetailPage()) {
+        initMemoDetailPage();
+    } else {
+        initMemoListPage();
+    }
 }
 
 function ensureLoadButton() {
@@ -445,25 +618,29 @@ function getNextList(options) {
 
 // ========== Tag Selection ==========
 document.addEventListener('click', function (event) {
-    var target = event.target;
-    if (target.tagName.toLowerCase() === 'a' && target.getAttribute('href') && target.getAttribute('href').startsWith('#')) {
-        event.preventDefault();
-        tag = target.getAttribute('href').substring(1);
-        
-        if (btnRemove) {
-            btnRemove = 0;
-            ensureLoadButton();
-        }
-        
-        getTagFirstList();
-        
-        var filterElem = document.getElementById('tag-filter');
-        filterElem.style.display = 'block';
-        var tags = document.getElementById('tags');
-        tags.innerHTML = `#${tag}<svg class="tag-close" viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>`;
-        
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+    var target = event.target.closest ? event.target.closest('a') : event.target;
+    if (!target || target.tagName.toLowerCase() !== 'a') return;
+
+    var href = target.getAttribute('href');
+    if (!href || !href.startsWith('#')) return;
+
+    event.preventDefault();
+    tag = href.substring(1);
+
+    if (isDetailPage()) {
+        window.location.href = '/#' + encodeURIComponent(tag);
+        return;
     }
+
+    if (btnRemove) {
+        btnRemove = 0;
+        ensureLoadButton();
+    }
+
+    getTagFirstList();
+    updateTagFilterDisplay(tag);
+    syncTagHash(tag);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
 function getTagFirstList() {
@@ -547,10 +724,9 @@ function clearFilter() {
     nextLength = 0;
     nextDom = '';
     nextPageToken = '';
-    
-    var filterElem = document.getElementById('tag-filter');
-    filterElem.style.display = 'none';
-    
+
+    updateTagFilterDisplay('');
+    syncTagHash('');
     memoDom.innerHTML = "";
     
     if (btnRemove) {
@@ -722,6 +898,170 @@ function updateHTMl(data) {
 }
 
 // 加载 Artalk 评论计数
+function renderMemoItem(memoData, options) {
+    var opts = options || {};
+
+    const TAG_REG = /#([^\s#\[\]<>]+)/g;
+    const BILIBILI_REG = /<a\shref="https:\/\/www\.bilibili\.com\/video\/((av[\d]{1,10})|(BV([\w]{10})))\/?">.*<\/a>/g;
+    const NETEASE_MUSIC_REG = /<a\shref="https:\/\/music\.163\.com\/.*id=([0-9]+)".*?>.*<\/a>/g;
+    const QQMUSIC_REG = /<a\shref="https\:\/\/y\.qq\.com\/.*(\/[0-9a-zA-Z]+)(\.html)?".*?>.*?<\/a>/g;
+    const QQVIDEO_REG = /<a\shref="https:\/\/v\.qq\.com\/.*\/([a-z|A-Z|0-9]+)\.html".*?>.*<\/a>/g;
+    const SPOTIFY_REG = /<a\shref="https:\/\/open\.spotify\.com\/(track|album)\/([\s\S]+)".*?>.*<\/a>/g;
+    const YOUKU_REG = /<a\shref="https:\/\/v\.youku\.com\/.*\/id_([a-z|A-Z|0-9|==]+)\.html".*?>.*<\/a>/g;
+    const YOUTUBE_REG = /<a\shref="https:\/\/www\.youtube\.com\/watch\?v\=([a-z|A-Z|0-9]{11})\".*?>.*<\/a>/g;
+
+    var uId = getMemoId(memoData);
+    if (!uId) return '';
+
+    var tagsHtml = '';
+    var contentForParse = memoData.content || '';
+    var tagMatches = contentForParse.match(TAG_REG);
+
+    if (tagMatches) {
+        var uniqueTags = Array.from(new Set(tagMatches));
+        tagsHtml = uniqueTags.map(function(tagText) {
+            var tagName = tagText.substring(1);
+            return "<span class='tag-span'><a rel='noopener noreferrer' href='" + buildTagLink(tagName) + "'>#" + tagName + "</a></span>";
+        }).join(' ');
+        contentForParse = contentForParse.replace(TAG_REG, '');
+    }
+
+    contentForParse = extractMath(contentForParse);
+
+    var memoParsed = marked.parse(contentForParse)
+        .replace(BILIBILI_REG, "<div class='video-wrapper'><iframe src='//www.bilibili.com/blackboard/html5mobileplayer.html?bvid=$1&as_wide=1&high_quality=1&danmaku=0' scrolling='no' border='0' frameborder='no' framespacing='0' allowfullscreen='true'></iframe></div>")
+        .replace(YOUTUBE_REG, "<div class='video-wrapper'><iframe src='https://www.youtube.com/embed/$1' title='YouTube video player' frameborder='0' allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture' allowfullscreen></iframe></div>")
+        .replace(NETEASE_MUSIC_REG, "<meting-js auto='https://music.163.com/#/song?id=$1'></meting-js>")
+        .replace(QQMUSIC_REG, "<meting-js auto='https://y.qq.com/n/yqq/song$1.html'></meting-js>")
+        .replace(QQVIDEO_REG, "<div class='video-wrapper'><iframe src='//v.qq.com/iframe/player.html?vid=$1' allowFullScreen='true' frameborder='no'></iframe></div>")
+        .replace(SPOTIFY_REG, "<div class='spotify-wrapper'><iframe style='border-radius:12px' src='https://open.spotify.com/embed/$1/$2?utm_source=generator&theme=0' width='100%' frameBorder='0' allowfullscreen='' allow='autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture' loading='lazy'></iframe></div>")
+        .replace(YOUKU_REG, "<div class='video-wrapper'><iframe src='https://player.youku.com/embed/$1' frameborder=0 'allowfullscreen'></iframe></div>");
+
+    var memoContREG = sanitizeHtml(memoParsed, { memosHost: memosHost, trustedIframeRules: TRUSTED_IFRAME_RULES });
+    memoContREG = restoreMath(memoContREG);
+    memoContREG += processResources(memoData, memo.APIVersion);
+
+    var relativeTime;
+    var avatarUrl;
+    if (memo.APIVersion === 'new') {
+        relativeTime = getRelativeTime(new Date(memoData.createTime));
+        avatarUrl = memosHost + '/api/v1/users/' + memo.creatorId + '/avatar';
+    } else {
+        relativeTime = getRelativeTime(new Date(memoData.createdTs * 1000));
+        avatarUrl = 'assets/img/avatar.jpg';
+    }
+
+    var detailUrl = buildMemoPermalink(uId);
+    var originalUrl = buildOriginalMemoLink(uId);
+    var actionLinkUrl = opts.isDetail ? originalUrl : detailUrl;
+    var actionLinkAttrs = opts.isDetail ? ' target=\"_blank\" rel=\"noopener noreferrer\"' : '';
+    var actionLinkTitle = opts.isDetail ? '查看原文' : '查看详情';
+    var timeHtml = opts.isDetail
+        ? relativeTime
+        : '<a href="' + detailUrl + '" title="查看详情">' + relativeTime + '</a>';
+
+    var commentIconHtml = '';
+    var commentContainerHtml = '';
+    if (siteConfig.artalk && siteConfig.artalk.enabled) {
+        var pageKey = '/memos/' + uId;
+        commentIconHtml = `
+                <a class="memo-comment-btn" href="javascript:void(0)" onclick="toggleArtalk('${uId}')" title="评论">
+                    <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
+                    <span class="comment-count artalk-comment-count" data-page-key="${pageKey}"></span>
+                </a>`;
+        commentContainerHtml = `
+                <div class="memo-comment artalk-container-${uId}" style="display:none;">
+                    <div id="artalk-${uId}"></div>
+                </div>`;
+    }
+
+    return `
+            <article class="memo-item${opts.isDetail ? ' memo-item-detail' : ''}" data-memo-id="${uId}">
+                <div class="memo-actions">
+                    ${commentIconHtml}
+                    <a class="memo-outlink" href="${actionLinkUrl}"${actionLinkAttrs} title="${actionLinkTitle}">
+                        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="18" height="18"><path fill="currentColor" d="M864 640a32 32 0 0 1 64 0v224.096A63.936 63.936 0 0 1 864.096 928H159.904A63.936 63.936 0 0 1 96 864.096V159.904C96 124.608 124.64 96 159.904 96H384a32 32 0 0 1 0 64H192.064A31.904 31.904 0 0 0 160 192.064v639.872A31.904 31.904 0 0 0 192.064 864h639.872A31.904 31.904 0 0 0 864 831.936V640zm-485.184 52.48a31.84 31.84 0 0 1-45.12-.128 31.808 31.808 0 0 1-.128-45.12L815.04 166.048l-176.128.736a31.392 31.392 0 0 1-31.584-31.744 32.32 32.32 0 0 1 31.84-32l255.232-1.056a31.36 31.36 0 0 1 31.584 31.584L924.928 388.8a32.32 32.32 0 0 1-32 31.84 31.392 31.392 0 0 1-31.712-31.584l.736-179.392L378.816 692.48z"/></svg>
+                    </a>
+                </div>
+                <div class="memo-header">
+                    <div class="memo-avatar">
+                        <img src="${avatarUrl}" alt="${memo.name}" loading="lazy" />
+                    </div>
+                    <div class="memo-meta">
+                        <div class="memo-author">
+                            <span class="memo-name">${memo.name}</span>
+                            <svg class="memo-verify" viewBox="0 0 24 24" aria-label="已认证">
+                                <path fill="currentColor" d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.998-3.818-3.998-.47 0-.92.084-1.336.25C14.818 2.415 13.51 1.5 12 1.5s-2.816.917-3.437 2.25c-.415-.165-.866-.25-1.336-.25-2.11 0-3.818 1.79-3.818 4 0 .494.083.964.237 1.4-1.272.65-2.147 2.018-2.147 3.6 0 1.495.782 2.798 1.942 3.486-.02.17-.032.34-.032.514 0 2.21 1.708 4 3.818 4 .47 0 .92-.086 1.335-.25.62 1.334 1.926 2.25 3.437 2.25 1.512 0 2.818-.916 3.437-2.25.415.163.865.248 1.336.248 2.11 0 3.818-1.79 3.818-4 0-.174-.012-.344-.033-.513 1.158-.687 1.943-1.99 1.943-3.484zm-6.616-3.334l-4.334 6.5c-.145.217-.382.334-.625.334-.143 0-.288-.04-.416-.126l-.115-.094-2.415-2.415c-.293-.293-.293-.768 0-1.06s.768-.294 1.06 0l1.77 1.767 3.825-5.74c.23-.345.696-.436 1.04-.207.346.23.44.696.21 1.04z"/>
+                            </svg>
+                            <span class="memo-username">@${memo.username}</span>
+                        </div>
+                        <div class="memo-time">${timeHtml}</div>
+                    </div>
+                </div>
+                <div class="memo-content">
+                    ${tagsHtml ? '<div class="memo-tags">' + tagsHtml + '</div>' : ''}
+                    ${memoContREG}
+                </div>
+                ${commentContainerHtml}
+            </article>
+        `;
+}
+
+function finalizeRenderedMemos(options) {
+    if (memo.doubanAPI) {
+        fetchDB();
+    }
+
+    var btn = document.querySelector('button.button-load');
+    if (btn) {
+        btn.textContent = '鍔犺浇鏇村';
+    }
+
+    window.ViewImage && ViewImage.init('.memo-content img');
+    renderAllMath();
+
+    if (siteConfig.artalk && siteConfig.artalk.enabled) {
+        loadArtalkCommentCounts();
+    }
+
+    if (options && options.autoOpenComments && options.memoId) {
+        openMemoCommentsWhenReady(options.memoId, 0);
+    }
+}
+
+function updateHTMl(data, options) {
+    var opts = options || {};
+
+    if (typeof marked === 'undefined') {
+        waitForMarked(function() {
+            updateHTMl(data, opts);
+        });
+        return;
+    }
+
+    var memoResult = "";
+    var memosList = memo.APIVersion === 'new' ? data.memos : data;
+
+    if (!memosList || memosList.length === 0) {
+        if (opts.replace && memoDom) {
+            memoDom.innerHTML = '';
+        }
+        return;
+    }
+
+    for (var i = 0; i < memosList.length; i++) {
+        memoResult += renderMemoItem(memosList[i], opts);
+    }
+
+    if (opts.replace) {
+        memoDom.innerHTML = memoResult;
+    } else {
+        memoDom.insertAdjacentHTML('beforeend', memoResult);
+    }
+
+    finalizeRenderedMemos(opts);
+}
+
 function loadArtalkCommentCounts() {
     // 等待 Artalk 加载完成
     if (typeof Artalk === 'undefined') {
