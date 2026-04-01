@@ -8,7 +8,8 @@ function getIsDarkTheme() {
      !document.body.classList.contains('light-theme'));
 }
 
-function toggleArtalk(memoId) {
+function toggleArtalk(memoId, options) {
+  var opts = options || {};
   if (!siteConfig.artalk || !siteConfig.artalk.enabled) return;
   if (typeof Artalk === 'undefined') {
     console.warn('Artalk not loaded');
@@ -40,9 +41,11 @@ function toggleArtalk(memoId) {
       });
     }
 
-    setTimeout(function () {
-      container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }, 100);
+    if (!opts.preventScroll) {
+      setTimeout(function () {
+        container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 100);
+    }
   }
 }
 

@@ -413,7 +413,7 @@ function openMemoCommentsWhenReady(memoId, retries) {
         }, 200);
         return;
     }
-    toggleArtalk(memoId);
+    toggleArtalk(memoId, { preventScroll: true });
 }
 
 function initMemoListPage() {
@@ -445,6 +445,7 @@ function initMemoDetailPage() {
         updateHTMl(detailPayload, {
             replace: true,
             isDetail: true,
+            autoOpenComments: true,
             memoId: memoId,
         });
     }).catch(function(err) {
