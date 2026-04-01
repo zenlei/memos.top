@@ -405,14 +405,23 @@ function fetchMemoDetail(memoId) {
 }
 
 function openMemoCommentsWhenReady(memoId, retries) {
+    var attempt = retries || 0;
+    var maxRetries = 150;
     if (!siteConfig.artalk || !siteConfig.artalk.enabled || typeof toggleArtalk !== 'function') return;
-    if (typeof Artalk === 'undefined') {
-        if ((retries || 0) >= 25) return;
+
+    var container = document.querySelector('.artalk-container-' + memoId);
+    if (!container || typeof Artalk === 'undefined') {
+        if (attempt >= maxRetries) return;
         setTimeout(function() {
-            openMemoCommentsWhenReady(memoId, (retries || 0) + 1);
+            openMemoCommentsWhenReady(memoId, attempt + 1);
         }, 200);
         return;
     }
+
+    if (container.style.display !== 'none' && container.style.display !== '') {
+        return;
+    }
+
     toggleArtalk(memoId, { preventScroll: true });
 }
 
@@ -1015,7 +1024,7 @@ function finalizeRenderedMemos(options) {
 
     var btn = document.querySelector('button.button-load');
     if (btn) {
-        btn.textContent = '鍔犺浇鏇村';
+        btn.textContent = '加载更多';
     }
 
     window.ViewImage && ViewImage.init('.memo-content img');
