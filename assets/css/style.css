@@ -595,6 +595,9 @@ body.dark-theme .icon-sun { display: none; }
     overflow-x: auto;
     margin: 12px 0;
     font-size: 13px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .memo-content code {
@@ -608,6 +611,9 @@ body.dark-theme .icon-sun { display: none; }
 .memo-content pre code {
     background: transparent;
     padding: 0;
+    white-space: inherit;
+    overflow-wrap: inherit;
+    word-break: inherit;
 }
 
 /* Blockquote */
