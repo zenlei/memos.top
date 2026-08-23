@@ -3,7 +3,7 @@
 
 基于原项目进行了以下修改：
 
-个人只使用新版（>= `v0.25.0`），老版（< `v0.25.0`）未进行测试。
+当前版本已适配并验证 Memos `v0.30.0`，同时保留 `v0.25` 与 legacy API 模式。
 
 ### 新增功能
 
@@ -48,10 +48,10 @@
 
 ### 使用方法
 
-##### 1. `clone`本仓库或[下载](https://github.com/eallion/memos.top/archive/refs/heads/main.zip)后部署
+##### 1. `clone` 本仓库后部署
 
 ```bash
-git clone https://github.com/eallion/memos.top
+git clone https://github.com/zenlei/memos.top
 ```
 
 ##### 2. 设置
@@ -64,12 +64,13 @@ var siteConfig = {
     memos: {
         host: 'https://demo.usememos.com/',  // Memos 服务地址，末尾有 /
         limit: '10',                          // 每页显示条数
-        creatorId: '1',                       // 用户 ID
+        creator: 'users/steven',              // v0.30 用户资源名
+        creatorId: '1',                       // 仅 legacy API 使用
         domId: '#memos',
         username: 'memos',                    // 显示的用户名
         name: 'Official Demo',                // 显示的全名
         language: 'zh-CN',
-        APIVersion: 'new',                    // 'new' (>= v0.25.0) 或 'legacy'
+        APIVersion: 'v0.30',                  // 'v0.30'、'v0.25' 或 'legacy'
         total: true,
         doubanAPI: '',
     },
@@ -89,7 +90,26 @@ var siteConfig = {
 };
 ```
 
-##### 3. 网站图标和头像 (*可选*)
+Memos `v0.30.0` 使用 `creator == "users/{username}"` 过滤 Memo。`creator` 必须填写 Memos 返回的用户资源名，而不是旧版数字用户 ID。
+
+使用 Memos `v0.25` 时，将 `APIVersion` 设置为 `v0.25`，并继续通过 `creatorId` 配置旧版数字用户 ID。
+
+##### 3. 允许匿名读取公开 Memo
+
+Memos `v0.30.0` 将未配置 instance URL 的实例视为私有实例，匿名请求会返回 `401 authentication required`。公开站点需要在 Memos 启动参数或容器环境变量中设置实例地址：
+
+```bash
+memos --instance-url https://memos.example.com
+```
+
+```yaml
+environment:
+  MEMOS_INSTANCE_URL: https://memos.example.com
+```
+
+重启 Memos 后，访问 `/api/v1/instance/profile`，确认返回的 `instanceUrl` 不为空。
+
+##### 4. 网站图标和头像 (*可选*)
 
 在 `assets/img` 目录中，替换成自己的图标和头像。
 
@@ -98,7 +118,7 @@ var siteConfig = {
 
 - [ ] 待办：获取 Memos 的默认头像：https://memos.apidocumentation.com/reference#tag/userservice/GET/file/{name}/avatar
 
-##### 4. 上传
+##### 5. 上传
 
 上传 `index.html` 文件 `assets` 目录及目录中的所有文件到网站根目录。
 

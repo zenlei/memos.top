@@ -3,11 +3,12 @@
 var memoDefaults = {
     host: 'https://demo.usememos.com/',
     limit: '10',
+    creator: 'users/steven',
     creatorId: '1',
     domId: '#memos',
     username: 'Admin',
     name: 'Administrator',
-    APIVersion: 'new',
+    APIVersion: 'v0.30',
     language: 'zh-CN',
     total: true,
     doubanAPI: '',
@@ -291,7 +292,7 @@ function isDetailPage() {
 
 function getMemoId(memoData) {
     if (!memoData) return '';
-    if (memo.APIVersion === 'new') {
+    if (memo.APIVersion !== 'legacy') {
         return memoData.uid || (memoData.name ? memoData.name.split('/').pop() : '');
     }
     return memoData.id;
@@ -398,7 +399,7 @@ function fetchMemoDetail(memoId) {
         return window.memoApi.fetchDetail(memo, memoId, { onError: handleFetchError });
     }
 
-    var detailUrl = memo.APIVersion === 'new'
+    var detailUrl = memo.APIVersion !== 'legacy'
         ? memosHost + '/api/v1/memos/' + encodeURIComponent(memoId)
         : memosHost + '/api/v1/memo/' + encodeURIComponent(memoId);
     return fetchJson(detailUrl, { onError: handleFetchError });
@@ -449,7 +450,7 @@ function initMemoDetailPage() {
 
     showMemoState('正在加载这条 Memo...', 'memo-loading');
     fetchMemoDetail(memoId).then(function(resdata) {
-        var detailPayload = memo.APIVersion === 'new' ? { memos: [resdata] } : [resdata];
+        var detailPayload = memo.APIVersion !== 'legacy' ? { memos: [resdata] } : [resdata];
         updateDetailPageInfo(resdata, memoId);
         updateHTMl(detailPayload, {
             replace: true,
@@ -459,7 +460,7 @@ function initMemoDetailPage() {
         });
     }).catch(function(err) {
         console.error('Load memo detail failed:', err);
-        showMemoState('这条 Memo 不存在或暂时不可访问。');
+        showMemoState(getFetchErrorMessage(err, '这条 Memo 不存在或暂时不可访问。'));
     });
 }
 
@@ -477,9 +478,22 @@ function removeLoadButton() {
 function handleFetchError(err) {
     console.error('Fetch error:', err);
     setLoadButtonText('重试加载');
+    if (isDetailPage()) return;
     if (memoDom && !document.getElementById('memo-error')) {
-        memoDom.insertAdjacentHTML('beforebegin', '<div id="memo-error" class="memo-error" style="color:#e54;margin:8px 0;">加载失败，请重试</div>');
+        memoDom.insertAdjacentHTML('beforebegin', '<div id="memo-error" class="no-results memo-error">' + getFetchErrorMessage(err, '加载失败，请重试。') + '</div>');
     }
+}
+
+function clearFetchError() {
+    var error = document.getElementById('memo-error');
+    if (error) error.remove();
+}
+
+function getFetchErrorMessage(err, fallback) {
+    if (window.memoApi && window.memoApi.isPrivateInstanceError(err)) {
+        return 'Memos 实例未开放匿名访问。请为 Memos 0.30 配置 instance URL 后重试。';
+    }
+    return fallback;
 }
 
 // 受信任的 iframe 域名/路径前缀（与现有正则替换保持一致）
@@ -493,8 +507,8 @@ const TRUSTED_IFRAME_RULES = [
 
 // ========== API URL ==========
 let memoUrl;
-if (memo.APIVersion === 'new') {
-    memoUrl = `${memosHost}/api/v1/memos?parent=users/${memo.creatorId}`;
+if (memo.APIVersion !== 'legacy') {
+    memoUrl = window.memoApi.buildListUrl(memo, {});
 } else if (memo.APIVersion === 'legacy') {
     memoUrl = memosHost + "/api/v1/memo?creatorId=" + memo.creatorId + "&rowStatus=NORMAL";
 } else {
@@ -538,8 +552,12 @@ function onLoadMoreClick() {
 function setUserAvatar() {
     var avatarImg = document.getElementById('user-avatar');
     if (avatarImg) {
-        if (memo.APIVersion === 'new') {
-            avatarImg.src = memosHost + '/api/v1/users/' + memo.creatorId + '/avatar';
+        if (memo.APIVersion !== 'legacy') {
+            avatarImg.src = window.memoApi.buildAvatarUrl(memo);
+            avatarImg.onerror = function() {
+                this.onerror = null;
+                this.src = 'assets/img/avatar.jpg';
+            };
         } else {
             avatarImg.src = 'assets/img/avatar.jpg';
         }
@@ -548,10 +566,9 @@ function setUserAvatar() {
 
 // ========== Get First List ==========
 function getFirstList() {
-    let memoUrl_first;
-    if (memo.APIVersion === 'new') {
-        memoUrl_first = memoUrl + '&pageSize=' + limit;
-        fetchJson(memoUrl_first, { onError: handleFetchError }).then(resdata => {
+    if (memo.APIVersion !== 'legacy') {
+        window.memoApi.fetchList(memo, { pageSize: limit }, { onError: handleFetchError }).then(resdata => {
+            clearFetchError();
             updateHTMl(resdata);
             nextPageToken = resdata.nextPageToken;
             var nowLength = resdata.memos ? resdata.memos.length : 0;
@@ -563,8 +580,8 @@ function getFirstList() {
             getNextList({ prefetchOnly: true });
         }).catch(() => {});
     } else if (memo.APIVersion === 'legacy') {
-        memoUrl_first = memoUrl + "&limit=" + limit;
-        fetchJson(memoUrl_first, { onError: handleFetchError }).then(resdata => {
+        window.memoApi.fetchList(memo, { pageSize: limit, offset: 0 }, { onError: handleFetchError }).then(resdata => {
+            clearFetchError();
             updateHTMl(resdata);
             var nowLength = resdata.length;
             if (nowLength < limit) {
@@ -581,9 +598,9 @@ function getFirstList() {
 // ========== Get Next List ==========
 function getNextList(options) {
     var opts = options || {};
-    if (memo.APIVersion === 'new') {
-        var memoUrl_next = memoUrl + '&pageSize=' + limit + '&pageToken=' + nextPageToken;
-        fetchJson(memoUrl_next, { onError: handleFetchError }).then(resdata => {
+    if (memo.APIVersion !== 'legacy') {
+        window.memoApi.fetchList(memo, { pageSize: limit, pageToken: nextPageToken }, { onError: handleFetchError }).then(resdata => {
+            clearFetchError();
             nextPageToken = resdata.nextPageToken;
             nextDom = resdata;
             nextLength = resdata.memos ? resdata.memos.length : 0;
@@ -602,10 +619,8 @@ function getNextList(options) {
             }
         }).catch(() => {});
     } else if (memo.APIVersion === 'legacy') {
-        var memoUrl_next = tag 
-            ? memoUrl + "&limit=" + limit + "&offset=" + offset + "&tag=" + tag
-            : memoUrl + "&limit=" + limit + "&offset=" + offset;
-        fetchJson(memoUrl_next, { onError: handleFetchError }).then(resdata => {
+        window.memoApi.fetchList(memo, { pageSize: limit, offset: offset, tag: tag }, { onError: handleFetchError }).then(resdata => {
+            clearFetchError();
             nextDom = resdata;
             nextLength = resdata.length;
             page++;
@@ -667,13 +682,13 @@ function getTagFirstList() {
         loadBtn.style.display = 'none';
     }
     
-    if (memo.APIVersion === 'new') {
+    if (memo.APIVersion !== 'legacy') {
         // 新版 API: 获取较大数量的 memos 并在客户端筛选
-        var tagFilterUrl = memoUrl + '&pageSize=100';
+        var tagFilterUrl = window.memoApi.buildListUrl(memo, { pageSize: 100 });
         fetchAllMemosWithTag(tagFilterUrl, []);
     } else if (memo.APIVersion === 'legacy') {
-        var memoUrl_tag = memoUrl + "&limit=" + limit + "&tag=" + tag;
-        fetchJson(memoUrl_tag, { onError: handleFetchError }).then(resdata => {
+        window.memoApi.fetchList(memo, { pageSize: limit, offset: 0, tag: tag }, { onError: handleFetchError }).then(resdata => {
+            clearFetchError();
             updateHTMl(resdata);
             var nowLength = resdata.length;
             if (nowLength < limit) {
@@ -692,6 +707,7 @@ function getTagFirstList() {
 // 递归获取所有包含指定标签的 memos
 function fetchAllMemosWithTag(url, allMemos) {
     fetchJson(url).then(resdata => {
+        clearFetchError();
         var memosList = resdata.memos || [];
         
         // 筛选包含指定标签的 memos
@@ -705,7 +721,7 @@ function fetchAllMemosWithTag(url, allMemos) {
         
         // 如果还有下一页，继续获取
         if (resdata.nextPageToken && memosList.length > 0) {
-            var nextUrl = memoUrl + '&pageSize=100&pageToken=' + resdata.nextPageToken;
+            var nextUrl = window.memoApi.buildListUrl(memo, { pageSize: 100, pageToken: resdata.nextPageToken });
             fetchAllMemosWithTag(nextUrl, allMemos);
         } else {
             // 所有数据获取完成，渲染筛选结果
@@ -768,7 +784,7 @@ function updateHTMl(data) {
     const YOUTUBE_REG = /<a\shref="https:\/\/www\.youtube\.com\/watch\?v\=([a-z|A-Z|0-9]{11})\".*?>.*<\/a>/g;
     
     // Process data based on API version
-    var memosList = memo.APIVersion === 'new' ? data.memos : data;
+    var memosList = memo.APIVersion !== 'legacy' ? data.memos : data;
     
     if (!memosList || memosList.length === 0) return;
     
@@ -777,7 +793,7 @@ function updateHTMl(data) {
         // 新版 API: name 格式为 "memos/{uid}"，需要提取 uid
         // 旧版 API: 直接使用 id
         var uId;
-        if (memo.APIVersion === 'new') {
+        if (memo.APIVersion !== 'legacy') {
             // 优先使用 uid，否则从 name 中提取
             uId = memoData.uid || (memoData.name ? memoData.name.split('/').pop() : '');
         } else {
@@ -825,9 +841,9 @@ function updateHTMl(data) {
         
         // Get time and avatar
         var relativeTime, avatarUrl;
-        if (memo.APIVersion === 'new') {
+        if (memo.APIVersion !== 'legacy') {
             relativeTime = getRelativeTime(new Date(memoData.createTime));
-            avatarUrl = memosHost + '/api/v1/users/' + memo.creatorId + '/avatar';
+            avatarUrl = window.memoApi.buildAvatarUrl(memo);
         } else {
             relativeTime = getRelativeTime(new Date(memoData.createdTs * 1000));
             avatarUrl = 'assets/img/avatar.jpg';
@@ -860,7 +876,7 @@ function updateHTMl(data) {
                 </div>
                 <div class="memo-header">
                     <div class="memo-avatar">
-                        <img src="${avatarUrl}" alt="${memo.name}" loading="lazy" />
+                        <img src="${avatarUrl}" alt="${memo.name}" loading="lazy" onerror="this.onerror=null;this.src='/assets/img/avatar.jpg'" />
                     </div>
                     <div class="memo-meta">
                         <div class="memo-author">
@@ -953,9 +969,9 @@ function renderMemoItem(memoData, options) {
 
     var relativeTime;
     var avatarUrl;
-    if (memo.APIVersion === 'new') {
+    if (memo.APIVersion !== 'legacy') {
         relativeTime = getRelativeTime(new Date(memoData.createTime));
-        avatarUrl = memosHost + '/api/v1/users/' + memo.creatorId + '/avatar';
+        avatarUrl = window.memoApi.buildAvatarUrl(memo);
     } else {
         relativeTime = getRelativeTime(new Date(memoData.createdTs * 1000));
         avatarUrl = 'assets/img/avatar.jpg';
@@ -995,7 +1011,7 @@ function renderMemoItem(memoData, options) {
                 </div>
                 <div class="memo-header">
                     <div class="memo-avatar">
-                        <img src="${avatarUrl}" alt="${memo.name}" loading="lazy" />
+                        <img src="${avatarUrl}" alt="${memo.name}" loading="lazy" onerror="this.onerror=null;this.src='/assets/img/avatar.jpg'" />
                     </div>
                     <div class="memo-meta">
                         <div class="memo-author">
@@ -1050,7 +1066,7 @@ function updateHTMl(data, options) {
     }
 
     var memoResult = "";
-    var memosList = memo.APIVersion === 'new' ? data.memos : data;
+    var memosList = memo.APIVersion !== 'legacy' ? data.memos : data;
 
     if (!memosList || memosList.length === 0) {
         if (opts.replace && memoDom) {
@@ -1102,7 +1118,7 @@ function loadArtalkCommentCounts() {
 function processResources(memoData, apiVersion) {
     var imgUrl = '', resUrl = '';
     // 新版 API 使用 attachments 或 resources，旧版使用 resourceList
-    var resourceList = apiVersion === 'new' 
+    var resourceList = apiVersion !== 'legacy'
         ? (memoData.attachments || memoData.resources) 
         : memoData.resourceList;
     
@@ -1116,7 +1132,7 @@ function processResources(memoData, apiVersion) {
         var resType = res.type.slice(0, 5);
         var resLink = '';
         
-        if (apiVersion === 'new') {
+        if (apiVersion !== 'legacy') {
             if (res.externalLink) {
                 resLink = res.externalLink;
             } else {
@@ -1255,10 +1271,8 @@ function bookShow(fetch_href, fetch_item) {
 function getTotal() {
     let pageUrl;
     
-    if (memo.APIVersion === 'new') {
-        pageUrl = `${memosHost}/api/v1/users/${memo.creatorId}:getStats`;
-        fetch(pageUrl)
-            .then(res => res.json())
+    if (memo.APIVersion !== 'legacy') {
+        window.memoApi.fetchStats(memo)
             .then(resdata => {
                 if (resdata && resdata.totalMemoCount !== undefined) {
                     var memosCount = document.getElementById('total');
@@ -1390,5 +1404,3 @@ if (backTopBtn) {
     });
     backTopBtn.style.display = 'none';
 }
-
-

@@ -1048,6 +1048,11 @@ body:not(.light-theme) .aplayer .aplayer-info .aplayer-music .aplayer-author {
     font-size: 14px;
 }
 
+.memo-error {
+    margin-bottom: 24px;
+    color: var(--text-secondary);
+}
+
 /* ========== Hidden Utility ========== */
 .hidden {
     display: none !important;

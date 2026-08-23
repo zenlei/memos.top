@@ -13,12 +13,13 @@ description: "一些关于声学、电子与创造的日常 Acoustics, Electroni
     memos: {
         host: 'https://memos.yanming.net/',  // Memos 实例地址
         limit: '10',                          // 每页显示数量
-        creatorId: '1',                       // 用户 ID (旧版是 101，新版是 1)
+        creator: 'users/xym',                 // Memos v0.30 用户资源名
+        creatorId: '1',                       // 仅 legacy API 使用
         domId: '#memos',                      // DOM 容器选择器
         username: 'ming',                     // 显示的用户名 (@xxx)
         name: 'Ming',                         // 显示的昵称
         language: 'zh-CN',                    // 语言设置 (用于相对时间)
-        APIVersion: 'new',                    // API 版本: 'new' (>=v0.22.0) 或 'legacy' (<v0.22.0)
+        APIVersion: 'v0.30',                  // 'v0.30'、'v0.25' 或 'legacy'
         total: true,                          // 是否显示总数统计
         doubanAPI: '',                        // 豆瓣 API 地址 (留空禁用)
     },

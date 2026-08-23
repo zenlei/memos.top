@@ -1,81 +1,159 @@
 // Memos API helpers
 // 依赖: fetchJson (来自 utils.js)
 
-(function () {
+(function (root) {
   function normalizeHost(host) {
-    return (host || '').replace(/\/$/, '');
+    return (host || '').replace(/\/+$/, '');
+  }
+
+  function normalizeApiVersion(apiVersion) {
+    if (apiVersion === 'legacy') return 'legacy';
+    if (apiVersion === 'v0.25') return 'v0.25';
+    return 'v0.30';
+  }
+
+  function getCreatorName(memoConfig) {
+    var cfg = memoConfig || {};
+    var creator = cfg.creator || cfg.creatorName || cfg.creatorId || '';
+    creator = String(creator).trim();
+    if (!creator) return '';
+    return creator.indexOf('users/') === 0 ? creator : 'users/' + creator;
+  }
+
+  function getCreatorId(memoConfig) {
+    var cfg = memoConfig || {};
+    var creatorId = cfg.creatorId || cfg.creator || cfg.creatorName || '';
+    creatorId = String(creatorId).trim();
+    return creatorId.indexOf('users/') === 0 ? creatorId.slice('users/'.length) : creatorId;
+  }
+
+  function escapeFilterString(value) {
+    return String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  }
+
+  function buildModernFilter(memoConfig, params) {
+    var filters = [];
+    var creatorName = getCreatorName(memoConfig);
+    if (creatorName) {
+      filters.push('creator == "' + escapeFilterString(creatorName) + '"');
+    }
+    if (params && params.filter) {
+      filters.push('(' + params.filter + ')');
+    }
+    return filters.join(' && ');
+  }
+
+  function appendQuery(base, params) {
+    var query = [];
+    Object.keys(params).forEach(function (key) {
+      var value = params[key];
+      if (value === undefined || value === null || value === '') return;
+      query.push(encodeURIComponent(key) + '=' + encodeURIComponent(value));
+    });
+    return query.length ? base + '?' + query.join('&') : base;
   }
 
   function buildListUrl(memoConfig, params) {
     var cfg = memoConfig || {};
     var host = normalizeHost(cfg.host);
-    var apiVersion = cfg.APIVersion || 'new';
-    var pageSize = params && params.pageSize;
-    var pageToken = params && params.pageToken;
-    var tag = params && params.tag;
-    var offset = params && params.offset;
+    var apiVersion = normalizeApiVersion(cfg.APIVersion);
+    var options = params || {};
 
-    if (apiVersion === 'new') {
-      var base = host + '/api/v1/memos?parent=users/' + cfg.creatorId;
-      if (pageSize) base += '&pageSize=' + pageSize;
-      if (pageToken) base += '&pageToken=' + pageToken;
-      // 新版暂不提供 tag 过滤参数，使用客户端过滤
-      return base;
+    if (apiVersion === 'v0.30') {
+      return appendQuery(host + '/api/v1/memos', {
+        pageSize: options.pageSize,
+        pageToken: options.pageToken,
+        filter: buildModernFilter(cfg, options),
+      });
     }
 
-    // legacy
-    var legacyBase = host + '/api/v1/memo?creatorId=' + cfg.creatorId + '&rowStatus=NORMAL';
-    if (pageSize) legacyBase += '&limit=' + pageSize;
-    if (typeof offset === 'number') legacyBase += '&offset=' + offset;
-    if (tag) legacyBase += '&tag=' + encodeURIComponent(tag);
-    return legacyBase;
+    if (apiVersion === 'v0.25') {
+      return appendQuery(host + '/api/v1/memos', {
+        parent: getCreatorId(cfg) ? 'users/' + getCreatorId(cfg) : '',
+        pageSize: options.pageSize,
+        pageToken: options.pageToken,
+      });
+    }
+
+    return appendQuery(host + '/api/v1/memo', {
+      creatorId: cfg.creatorId,
+      rowStatus: 'NORMAL',
+      limit: options.pageSize,
+      offset: typeof options.offset === 'number' ? options.offset : undefined,
+      tag: options.tag,
+    });
   }
 
   function fetchList(memoConfig, params, options) {
-    var url = buildListUrl(memoConfig, params || {});
-    return fetchJson(url, options);
+    return root.fetchJson(buildListUrl(memoConfig, params || {}), options);
   }
 
   function buildStatsUrl(memoConfig) {
     var cfg = memoConfig || {};
     var host = normalizeHost(cfg.host);
-    var apiVersion = cfg.APIVersion || 'new';
-    if (apiVersion === 'new') {
-      return host + '/api/v1/users/' + cfg.creatorId + ':getStats';
+    var apiVersion = normalizeApiVersion(cfg.APIVersion);
+    if (apiVersion === 'v0.30') {
+      return host + '/api/v1/' + getCreatorName(cfg) + ':getStats';
     }
-    return host + '/api/v1/memo/stats?creatorId=' + cfg.creatorId;
+    if (apiVersion === 'v0.25') {
+      return host + '/api/v1/users/' + encodeURIComponent(getCreatorId(cfg)) + ':getStats';
+    }
+    return host + '/api/v1/memo/stats?creatorId=' + encodeURIComponent(cfg.creatorId || '');
   }
 
   function fetchStats(memoConfig, options) {
-    var url = buildStatsUrl(memoConfig);
-    return fetchJson(url, options);
+    return root.fetchJson(buildStatsUrl(memoConfig), options);
   }
 
   function buildDetailUrl(memoConfig, memoId) {
     var cfg = memoConfig || {};
     var host = normalizeHost(cfg.host);
-    var apiVersion = cfg.APIVersion || 'new';
+    var apiVersion = normalizeApiVersion(cfg.APIVersion);
     var normalizedId = memoId || '';
 
-    if (apiVersion === 'new') {
+    if (apiVersion !== 'legacy') {
       return host + '/api/v1/memos/' + encodeURIComponent(normalizedId);
     }
-
     return host + '/api/v1/memo/' + encodeURIComponent(normalizedId);
   }
 
   function fetchDetail(memoConfig, memoId, options) {
-    var url = buildDetailUrl(memoConfig, memoId);
-    return fetchJson(url, options);
+    return root.fetchJson(buildDetailUrl(memoConfig, memoId), options);
   }
 
-  // 导出全局
-  window.memoApi = {
+  function buildAvatarUrl(memoConfig) {
+    var cfg = memoConfig || {};
+    var apiVersion = normalizeApiVersion(cfg.APIVersion);
+    if (apiVersion === 'legacy') {
+      return 'assets/img/avatar.jpg';
+    }
+    if (apiVersion === 'v0.25') {
+      return normalizeHost(cfg.host) + '/api/v1/users/' + encodeURIComponent(getCreatorId(cfg)) + '/avatar';
+    }
+    return normalizeHost(cfg.host) + '/file/' + getCreatorName(cfg) + '/avatar';
+  }
+
+  function isPrivateInstanceError(error) {
+    return Boolean(error && error.status === 401 && (error.code === 16 || /authentication required/i.test(error.message || '')));
+  }
+
+  var api = {
+    normalizeHost: normalizeHost,
+    normalizeApiVersion: normalizeApiVersion,
+    getCreatorName: getCreatorName,
+    getCreatorId: getCreatorId,
     buildListUrl: buildListUrl,
     fetchList: fetchList,
     buildStatsUrl: buildStatsUrl,
     fetchStats: fetchStats,
     buildDetailUrl: buildDetailUrl,
     fetchDetail: fetchDetail,
+    buildAvatarUrl: buildAvatarUrl,
+    isPrivateInstanceError: isPrivateInstanceError,
   };
-})();
+
+  root.memoApi = api;
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = api;
+  }
+})(typeof window !== 'undefined' ? window : globalThis);

@@ -1,0 +1,7 @@
+{
+  "name": "memos-top-static",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/*.test.js && node --check assets/js/api.js && node --check assets/js/utils.js && node --check assets/js/config.js && node --check assets/js/main.js"
+  }
+}

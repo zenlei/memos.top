@@ -4,9 +4,22 @@ function fetchJson(url, { timeout = 15000, onError } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
   return fetch(url, { signal: controller.signal })
-    .then(res => {
+    .then(async res => {
       clearTimeout(timer);
-      if (!res.ok) throw new Error('HTTP ' + res.status);
+      if (!res.ok) {
+        let payload = null;
+        try {
+          payload = await res.json();
+        } catch (_) {
+          // Ignore non-JSON error bodies.
+        }
+        const message = payload && payload.message ? payload.message : 'HTTP ' + res.status;
+        const error = new Error(message);
+        error.status = res.status;
+        error.code = payload && payload.code;
+        error.payload = payload;
+        throw error;
+      }
       return res.json();
     })
     .catch(err => {
