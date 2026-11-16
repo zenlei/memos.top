@@ -99,10 +99,10 @@ function initSiteInfo() {
         if (siteStats && siteConfig.stats && siteConfig.stats.enabled) {
             var statsHtml = [];
             if (siteConfig.stats.showPV) {
-                statsHtml.push('<span class="stat-pv">访问量: <span id="busuanzi_site_pv">-</span></span>');
+                statsHtml.push('<span class="stat-pv">访问量: <span id="busuanzi_value_site_pv">-</span></span>');
             }
             if (siteConfig.stats.showUV) {
-                statsHtml.push('<span class="stat-uv">访客数: <span id="busuanzi_site_uv">-</span></span>');
+                statsHtml.push('<span class="stat-uv">访客数: <span id="busuanzi_value_site_uv">-</span></span>');
             }
             if (statsHtml.length > 0) {
                 siteStats.innerHTML = statsHtml.join(' · ');
