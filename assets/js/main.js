@@ -102,16 +102,18 @@ function initSiteInfo() {
                 { prefix: 'busuanzi_', src: 'https://cdn.busuanzi.cc/busuanzi/3.6.9/busuanzi.min.js' },
                 { prefix: 'busuanzi_value_', src: 'https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js' }
             ];
-            siteStats.innerHTML = statsProviders.map(function(provider) {
-                var values = [];
-                if (siteConfig.stats.showPV) {
-                    values.push('<span class="stat-pv">访问量: <span id="' + provider.prefix + 'site_pv">-</span></span>');
-                }
-                if (siteConfig.stats.showUV) {
-                    values.push('<span class="stat-uv">访客数: <span id="' + provider.prefix + 'site_uv">-</span></span>');
-                }
-                return '<span class="stats-provider">' + values.join(' · ') + '</span>';
-            }).join('');
+            var statsHtml = [];
+            if (siteConfig.stats.showPV) {
+                statsHtml.push('<span class="stat-pv">PV ' + statsProviders.map(function(provider) {
+                    return '<span id="' + provider.prefix + 'site_pv">-</span>';
+                }).join(' / ') + '</span>');
+            }
+            if (siteConfig.stats.showUV) {
+                statsHtml.push('<span class="stat-uv">UV ' + statsProviders.map(function(provider) {
+                    return '<span id="' + provider.prefix + 'site_uv">-</span>';
+                }).join(' / ') + '</span>');
+            }
+            siteStats.innerHTML = statsHtml.join(' · ');
             siteStats.style.display = 'inline';
             // 先创建统计元素，再独立加载两家脚本，避免一家超时阻塞另一家。
             statsProviders.forEach(function(provider) {

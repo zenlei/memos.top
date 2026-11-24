@@ -32,9 +32,10 @@ test('loads both counters independently after creating separate PV/UV targets', 
   const { container, scripts } = renderStats({ enabled: true, showPV: true, showUV: true });
   assert.equal(container.style.display, 'inline');
   assert.doesNotMatch(container.innerHTML, /busuanzi\.cc|ibruce\.info/);
+  assert.equal(container.innerHTML.replace(/<[^>]+>/g, ''), 'PV - / - · UV - / -');
   assert.deepEqual(
     [...container.innerHTML.matchAll(/id="([^"]+)"/g)].map((match) => match[1]),
-    ['busuanzi_site_pv', 'busuanzi_site_uv', 'busuanzi_value_site_pv', 'busuanzi_value_site_uv'],
+    ['busuanzi_site_pv', 'busuanzi_value_site_pv', 'busuanzi_site_uv', 'busuanzi_value_site_uv'],
   );
   assert.deepEqual(scripts.map((script) => new URL(script.src).hostname), [
     'cdn.busuanzi.cc', 'busuanzi.ibruce.info',

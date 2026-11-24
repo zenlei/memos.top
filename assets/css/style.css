@@ -123,14 +123,11 @@ img {
 
 .site-stats {
     font-size: 12px;
+    white-space: nowrap;
     color: var(--text-secondary);
     padding: 4px 10px;
     background: var(--tag-bg);
     border-radius: 4px;
-}
-
-.stats-provider {
-    display: block;
 }
 
 .brand-icon {
