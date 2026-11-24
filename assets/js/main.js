@@ -96,18 +96,30 @@ function initSiteInfo() {
         
         // 访问统计
         var siteStats = document.getElementById('site-stats');
-        if (siteStats && siteConfig.stats && siteConfig.stats.enabled) {
-            var statsHtml = [];
-            if (siteConfig.stats.showPV) {
-                statsHtml.push('<span class="stat-pv">访问量: <span id="busuanzi_value_site_pv">-</span></span>');
-            }
-            if (siteConfig.stats.showUV) {
-                statsHtml.push('<span class="stat-uv">访客数: <span id="busuanzi_value_site_uv">-</span></span>');
-            }
-            if (statsHtml.length > 0) {
-                siteStats.innerHTML = statsHtml.join(' · ');
-                siteStats.style.display = 'inline';
-            }
+        if (siteStats && siteConfig.stats && siteConfig.stats.enabled &&
+            (siteConfig.stats.showPV || siteConfig.stats.showUV)) {
+            var statsProviders = [
+                { prefix: 'busuanzi_', src: 'https://cdn.busuanzi.cc/busuanzi/3.6.9/busuanzi.min.js' },
+                { prefix: 'busuanzi_value_', src: 'https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js' }
+            ];
+            siteStats.innerHTML = statsProviders.map(function(provider) {
+                var values = [];
+                if (siteConfig.stats.showPV) {
+                    values.push('<span class="stat-pv">访问量: <span id="' + provider.prefix + 'site_pv">-</span></span>');
+                }
+                if (siteConfig.stats.showUV) {
+                    values.push('<span class="stat-uv">访客数: <span id="' + provider.prefix + 'site_uv">-</span></span>');
+                }
+                return '<span class="stats-provider">' + values.join(' · ') + '</span>';
+            }).join('');
+            siteStats.style.display = 'inline';
+            // 先创建统计元素，再独立加载两家脚本，避免一家超时阻塞另一家。
+            statsProviders.forEach(function(provider) {
+                var script = document.createElement('script');
+                script.src = provider.src;
+                script.async = true;
+                document.head.appendChild(script);
+            });
         }
     }
 }

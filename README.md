@@ -18,6 +18,11 @@
   - 新增 `assets/js/config.js` 统一管理配置
   - 支持站点信息、导航链接、Artalk 等配置项
 
+- **双来源访问统计**
+  - `busuanzi.cc` 和 `busuanzi.ibruce.info` 并行计数，分两行显示各自的 PV/UV；一家不可用时不阻塞另一家
+  - 两家历史数据和统计口径独立，数值不合并；请求失败时对应数值保留 `-`
+  - `siteConfig.stats` 的 `enabled`、`showPV`、`showUV` 控制统计接入和显示；关闭统计或同时隐藏 PV/UV 时不加载统计脚本
+
 ### 优化改进
 
 - **标签筛选优化**：改进中文标签支持，添加清除筛选按钮

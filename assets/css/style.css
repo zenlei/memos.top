@@ -129,6 +129,10 @@ img {
     border-radius: 4px;
 }
 
+.stats-provider {
+    display: block;
+}
+
 .brand-icon {
     width: 28px;
     height: 28px;
@@ -940,10 +944,13 @@ body:not(.light-theme) .aplayer .aplayer-info .aplayer-music .aplayer-author {
 @media (max-width: 640px) {
     .header-inner {
         padding: 10px 12px;
+        flex-wrap: wrap;
+        gap: 8px;
     }
 
     .site-nav {
         gap: 12px;
+        flex-wrap: wrap;
     }
 
     .site-nav > a:not(:last-of-type) {
